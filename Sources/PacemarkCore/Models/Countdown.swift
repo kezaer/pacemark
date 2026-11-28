@@ -51,7 +51,8 @@ public enum Countdown {
                       let count = Int(part.dropLast()) else { return nil }
                 return "\(count) \(unit)\(count == 1 ? "" : "s")"
             }
-            return "resets in \(parts.formatted(.list(type: .and)))"
+            guard !parts.isEmpty else { return countdown }
+            return "resets in \(parts.joined(separator: " and "))"
         }
     }
 

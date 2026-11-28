@@ -78,15 +78,13 @@ struct MenuBarGaugeRenderer {
         let dotted = meter.awaitingFirstReading || meter.summary.needsAttention
         let isCritical = meter.isLiveReading && !dotted && severity == .critical
         let numeralInk = isCritical ? palette.severityInk(for: severity).menuBarColor : ink
-        let ringTrack = isCritical && palette.increasedContrast
-            ? PacemarkMeterColorValues.criticalBarTrack(dark: palette.isDarkMenuBar).menuBarColor : track
         return gaugeArtwork(meter, layout: layout, kind: kind, fill: fill, color: color,
-                            number: number, numeralInk: numeralInk, ringTrack: ringTrack, dotted: dotted)
+                            number: number, numeralInk: numeralInk, dotted: dotted)
     }
 
     private func gaugeArtwork(
         _ meter: MenuBarMeter, layout: UniformRingLayout, kind: MenuBarGlyphKind,
-        fill: Double, color: NSColor, number: String?, numeralInk: NSColor, ringTrack: NSColor, dotted: Bool
+        fill: Double, color: NSColor, number: String?, numeralInk: NSColor, dotted: Bool
     ) -> Piece {
         let geometry = layout.geometry
         let innerDiameter = 2 * geometry.innerRadius
@@ -103,7 +101,7 @@ struct MenuBarGaugeRenderer {
         }
         let gauge = withKnockouts(overlay([
             Piece(width: max(geometry.artworkWidth, ceil(label.width) + 1)) { _ in },
-            ring(fill: fill, color: color, track: ringTrack, layout: geometry, dotted: dotted),
+            ring(fill: fill, color: color, layout: geometry, dotted: dotted),
             tuning.showPaceTick ? paceTick(angle: tickAngle, layout: geometry) : .empty,
             label
         ]))
@@ -254,7 +252,7 @@ struct MenuBarGaugeRenderer {
     }
 
     private func ring(
-        fill: Double, color: NSColor, track: NSColor, layout: MenuBarRingLayout, dotted: Bool
+        fill: Double, color: NSColor, layout: MenuBarRingLayout, dotted: Bool
     ) -> Piece {
         let diameter = layout.diameter
         let radius = (diameter - layout.stroke) / 2

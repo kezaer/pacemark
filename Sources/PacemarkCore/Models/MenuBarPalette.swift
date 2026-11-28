@@ -44,10 +44,10 @@ public struct MenuBarPalette: Sendable, Equatable {
         PacemarkTint(color: ink.color, opacity: ink.opacity * 0.62)
     }
 
-    /// The gauge fill. Increase Contrast gives the critical red more separation.
+    /// The gauge fill follows the menu bar appearance and Increase Contrast.
     public func liquid(for severity: UsageSeverity) -> PacemarkRGBColor {
         PacemarkSeverityColorValues.fill(
-            for: severity, dark: isDarkMenuBar, increasedContrast: increasedContrast && severity == .critical
+            for: severity, dark: isDarkMenuBar, increasedContrast: increasedContrast
         )
     }
 

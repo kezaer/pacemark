@@ -44,8 +44,8 @@ Add a token when an existing role cannot express a need shared by multiple views
    with the pace tick for live windows with a known future reset and duration. Either
    direction uses green within 5 percentage points, yellow up to 15 points, and red beyond
    15 points. Without pace evidence, green means above 50% left, yellow means above 15%
-   through 50%, and red means 15% or less. Standard dark critical fill has an accepted contrast exception
-   against the track and Ledger card. The numeral has its own contrast-checked ink.
+   through 50%, and red means 15% or less. Both dark critical fills have accepted contrast
+   exceptions on the neutral track and Ledger card. The numeral has its own contrast-checked ink.
    Account and lifecycle states use neutral ink. Provider refusals, limit-reached sentences
    and spend alerts retain their separate critical status ink.
 5. **Things that look the same behave the same.** A filled, outlined chip is *state*; a flat

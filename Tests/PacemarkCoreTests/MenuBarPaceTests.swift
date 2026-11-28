@@ -58,6 +58,26 @@ struct MenuBarPaceTests {
         #expect(pace?.tier == .offPace(.fast))
     }
 
+    @Test func scalesTimeBeforeDivisionAtTheFivePointBoundary() {
+        let reset = now.addingTimeInterval(1_899)
+        let fast = MenuBarPace(window: UsageWindow(kind: .fiveHour, utilization: 94.5, resetsAt: reset), now: now)
+        #expect(fast?.expectedRemaining == 1_899.0 / duration)
+        #expect(fast?.deviationTenths == -51)
+        #expect(fast?.tier == .offPace(.fast))
+
+        let calm = MenuBarPace(window: UsageWindow(kind: .fiveHour, utilization: 84.4, resetsAt: reset), now: now)
+        #expect(calm?.deviationTenths == 50)
+        #expect(calm?.tier == .onPace)
+    }
+
+    @Test func fractionInitializerPreservesUtilizationDecimalTies() {
+        let pace = MenuBarPace(usedFraction: 0.0505, duration: duration,
+                               reset: now.addingTimeInterval(duration), now: now)
+        #expect(pace?.remaining == 1 - 0.0505)
+        #expect(pace?.deviationTenths == -50)
+        #expect(pace?.tier == .onPace)
+    }
+
     private func makePace(used: Double, elapsed: Double) -> MenuBarPace? {
         MenuBarPace(window: UsageWindow(kind: .fiveHour, utilization: used,
                                        resetsAt: now.addingTimeInterval(duration * (1 - elapsed))), now: now)

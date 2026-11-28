@@ -20,6 +20,18 @@ public struct UsageDisplayValue: Equatable, Sendable {
         sourceUtilization = utilization
     }
 
+    /// Fraction-only callers scale the source decimal before subtracting from 100,
+    /// so e.g. 0.0505 does not turn into 5.050000000000001 percent used.
+    init?(usedFraction: Double) {
+        guard usedFraction.isFinite else { return nil }
+        let clamped = min(1, max(0, usedFraction))
+        // Fractions below this floor display as 100% remaining. Skip conversion of subnormals.
+        let fraction = clamped < 0.0005 ? Decimal.zero : Decimal(string: String(clamped), locale: Self.decimalLocale)
+        guard let fraction else { return nil }
+        percentRemaining = Self.normalize(100 - fraction * 100)
+        sourceUtilization = nil
+    }
+
     /// For resolved projections. Provider windows should use the window/utilization
     /// initializer so decimal subtraction happens before normalization.
     public init?(percentRemaining: Double) {

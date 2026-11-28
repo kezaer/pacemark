@@ -441,12 +441,12 @@ public enum PacemarkMeterColorValues {
         PacemarkTint(color: dark ? .white : .black, opacity: dark ? 0.265 : 0.36)
     }
 
-    /// The critical track shares the standard fill's hue. The darker track leaves room
-    /// for the Increase Contrast red to meet the 3:1 track floor.
+    /// The compatibility meter's tinted track stays close to the neutral track in lightness
+    /// and shares the standard critical fill's hue.
     public static func criticalBarTrack(dark: Bool) -> PacemarkRGBColor {
         let fill = PacemarkSeverityColorValues.criticalFill(dark: dark, increasedContrast: false)
         return PacemarkOKLCH(
-            lightness: dark ? 0.329 : 0.905,
+            lightness: dark ? 0.391 : 0.905,
             chroma: dark ? 0.055 : 0.045,
             hue: PacemarkOKLCH(fill).hue
         ).rgb

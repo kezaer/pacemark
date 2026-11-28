@@ -42,6 +42,17 @@ struct MenuBarPaletteTests {
         }
     }
 
+    @Test func lightIncreaseContrastDarkensHealthyAndLowFills() {
+        let standard = MenuBarPalette(isDarkMenuBar: false)
+        let increased = MenuBarPalette(isDarkMenuBar: false, increasedContrast: true)
+        for severity in [UsageSeverity.healthy, .low] {
+            #expect(increased.liquid(for: severity)
+                == PacemarkSeverityColorValues.fill(for: severity, dark: false, increasedContrast: true))
+            #expect(standard.liquid(for: severity) != increased.liquid(for: severity))
+        }
+        #expect(standard.liquid(for: .critical) == increased.liquid(for: .critical))
+    }
+
     @Test func darkLiquidAppliesIncreaseContrastToCriticalOnly() {
         let standard = MenuBarPalette(isDarkMenuBar: true)
         let increased = MenuBarPalette(isDarkMenuBar: true, increasedContrast: true)

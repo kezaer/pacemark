@@ -57,23 +57,29 @@ public struct MenuBarPace: Sendable, Equatable {
     public init?(usedFraction: Double, duration: TimeInterval?, reset: Date?, now: Date) {
         guard usedFraction.isFinite else { return nil }
         let used = min(1, max(0, usedFraction))
-        guard let displayed = UsageDisplayValue(utilization: used * 100) else { return nil }
+        guard let displayed = UsageDisplayValue(usedFraction: used) else { return nil }
         self.init(usedFraction: used, displayed: displayed, duration: duration, reset: reset, now: now)
     }
 
     private init(usedFraction: Double, displayed: UsageDisplayValue, duration: TimeInterval?, reset: Date?, now: Date) {
         remaining = 1 - usedFraction
+        let expected: UsageDisplayValue?
         if let duration, duration.isFinite, duration > 0,
            let timeToReset = reset?.timeIntervalSince(now), timeToReset.isFinite {
-            // Time left is the complement of elapsed. Use the direct ratio to avoid
-            // subtracting from one twice before display rounding.
-            expectedRemaining = min(1, max(0, timeToReset / duration))
+            let timeLeft = min(duration, max(0, timeToReset))
+            let fraction = timeLeft / duration
+            expectedRemaining = fraction
+            // Scale before dividing so 1,899 seconds of 18,000 yields exactly 10.55%.
+            let scaledTime = timeLeft * 100
+            expected = UsageDisplayValue(
+                percentRemaining: scaledTime.isFinite ? scaledTime / duration : fraction * 100
+            )
         } else {
             expectedRemaining = nil
+            expected = nil
         }
 
-        guard let expectedRemaining,
-              let expected = UsageDisplayValue(percentRemaining: expectedRemaining * 100) else {
+        guard let expected else {
             deviationTenths = nil
             tier = nil
             return

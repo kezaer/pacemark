@@ -16,7 +16,7 @@ struct BrandColorValuesTests {
             for increasedContrast in [false, true] {
                 let fill = PacemarkSeverityColorValues.criticalFill(dark: dark, increasedContrast: increasedContrast)
                 #expect(contrastRatio(fill, plate) >= 3)
-                if !dark || increasedContrast { #expect(contrastRatio(fill, card) >= 3) }
+                if !dark { #expect(contrastRatio(fill, card) >= 3) }
             }
         }
         // The brighter default Ledger card used when approving the revised ink.
@@ -33,6 +33,15 @@ struct BrandColorValuesTests {
         // The original single-account fixture has a slightly brighter substrate.
         #expect(abs(contrastRatio(fill, rgb(87, 88, 91)) - 1.5267) < 0.0001)
         #expect(abs(contrastRatio(fill, rgb(55, 56, 59)) - 2.5162) < 0.0001)
+    }
+
+    @Test func increasedContrastDarkCriticalFillHasAnAcceptedLedgerTrackAndCardException() {
+        let fill = PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: true)
+        // Use the same neutral track and card samples as the standard dark fill.
+        #expect(abs(contrastRatio(fill, rgb(85, 85, 85)) - 1.9261) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(53, 53, 53)) - 3.1690) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(87, 88, 91)) - 1.8378) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(55, 56, 59)) - 3.0289) < 0.0001)
     }
 
     @Test func statusCriticalInkRetainsItsIndependentPalette() {
@@ -182,11 +191,13 @@ struct BrandColorValuesTests {
                 let fill = PacemarkSeverityColorValues.criticalFill(dark: dark, increasedContrast: increasedContrast)
                 #expect(abs(PacemarkOKLCH(track).hue - PacemarkOKLCH(fill).hue) < 2)
                 let ratio = contrastRatio(fill, track)
-                if dark && !increasedContrast {
-                    #expect(ratio < 3 && ratio > 2.5, "Accepted standard dark track: \(ratio)")
-                } else {
-                    #expect(ratio >= 3, "Critical fill vs tinted track: \(ratio)")
-                }
+                #expect(ratio >= (dark ? 2 : 3), "Critical fill vs tinted track: \(ratio)")
+            }
+            for card in raisedTileFillColors(dark: dark) {
+                let neutral = composite(PacemarkColorValues.barTrack(dark: dark), over: card)
+                let shift = abs(abs(apcaLc(text: track, background: card))
+                    - abs(apcaLc(text: neutral, background: card)))
+                #expect(shift < 12, "dark=\(dark) tinted track shifts |Lc| by \(shift)")
             }
         }
     }
@@ -496,21 +507,19 @@ struct BrandColorValuesTests {
         }
     }
 
-    /// The 3:1 (WCAG 1.4.11) floor still holds everywhere it is claimed: every dark fill, and
-    /// every light fill once the user turns on Increase Contrast. The *default* light
-    /// appearance is deliberately exempt — see the redundant-visualization test below.
+    /// Increase Contrast fills meet 3:1 on the neutral track, with the named dark critical
+    /// exception covered separately.
     @Test func everySeverityFillClearsNonTextContrastWhereItIsClaimed() {
         for dark in [true, false] {
             for background in raisedTileFillColors(dark: dark) {
                 let track = composite(PacemarkColorValues.barTrack(dark: dark), over: background)
-                for severity in [UsageSeverity.healthy, .low, .critical] {
+                for severity in [UsageSeverity.healthy, .low, .critical] where !dark || severity != .critical {
                     let fill = PacemarkSeverityColorValues.fill(
                         for: severity,
                         dark: dark,
                         increasedContrast: true
                     )
-                    let background = severity == .critical ? PacemarkMeterColorValues.criticalBarTrack(dark: dark) : track
-                    #expect(contrastRatio(fill, background) >= 3, "\(severity), dark=\(dark)")
+                    #expect(contrastRatio(fill, track) >= 3, "\(severity), dark=\(dark)")
                 }
             }
         }

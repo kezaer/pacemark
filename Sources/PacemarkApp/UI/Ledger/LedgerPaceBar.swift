@@ -22,9 +22,7 @@ struct LedgerPaceBar: View {
         let palette = MenuBarPalette(isDarkMenuBar: scheme == .dark, increasedContrast: contrast == .increased)
         let band = pace?.tier?.severity ?? severity
         let fill = dimmed ? Color.primary.opacity(0.30) : Color(nsColor: palette.liquid(for: band).menuBarColor)
-        let track = !dimmed && band == .critical && palette.increasedContrast
-            ? Color(nsColor: PacemarkMeterColorValues.criticalBarTrack(dark: palette.isDarkMenuBar).menuBarColor)
-            : Color(nsColor: palette.ink.menuBarColor).opacity(0.16)
+        let track = Color(nsColor: palette.ink.menuBarColor).opacity(0.16)
         ZStack(alignment: .leading) {
             Capsule().fill(track)
                 .frame(width: width, height: height)
