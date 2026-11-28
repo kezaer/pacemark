@@ -15,14 +15,16 @@ struct LedgerPaceBar: View {
     var mode: UsagePercentageMode = .remaining
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let palette = MenuBarPalette(isDarkMenuBar: scheme == .dark)
-        let fill = dimmed ? Color.primary.opacity(0.30)
-            : Color(nsColor: palette.liquid(for: pace?.tier?.severity ?? severity).menuBarColor)
+        let palette = MenuBarPalette(isDarkMenuBar: scheme == .dark, increasedContrast: contrast == .increased)
+        let band = pace?.tier?.severity ?? severity
+        let fill = dimmed ? Color.primary.opacity(0.30) : Color(nsColor: palette.liquid(for: band).menuBarColor)
+        let track = Color(nsColor: palette.ink.menuBarColor).opacity(0.16)
         ZStack(alignment: .leading) {
-            Capsule().fill(Color(nsColor: palette.ink.menuBarColor).opacity(0.16))
+            Capsule().fill(track)
                 .frame(width: width, height: height)
             let fraction = mode == .remaining ? remaining : 1 - remaining
             if fraction > 0 {

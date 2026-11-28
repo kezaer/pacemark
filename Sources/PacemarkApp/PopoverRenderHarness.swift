@@ -380,7 +380,8 @@ enum PopoverRenderHarness {
         store.refreshNow()
         try? await Task.sleep(for: .milliseconds(700))
         await awaitSettledRefresh(store)
-        return await snapshotPopover(store: store, dark: dark, to: url)
+        return await snapshotPopover(store: store, dark: dark, to: url,
+                                     fixtureDate: scenario == .paceStates ? DemoFixture.paceStatesDate : nil)
     }
 
     /// The store a multi-account capture draws, set up the way `AppComposition.demoMultiAccountStore`
@@ -389,6 +390,9 @@ enum PopoverRenderHarness {
     /// providers are wired with their API surfaces enabled, so `spend-states`' xAI and Cursor rows
     /// reach the card.
     static func multiStore(for scenario: MultiAccountScenario) -> UsageStore {
+        if scenario == .paceStates {
+            return AppComposition.demoMultiAccountStore(scenario: .paceStates, defaults: DemoMemoryDefaults())
+        }
         let preferences = renderPreferences(mode: .remaining)
         let fixture = DemoFixture.multiFixture(for: scenario, includesLedgerDetails: preferences.accountLayout == .ledger)
         // Use settled readings at multi-20 instead of waiting for its 4s-per-account simulated probes.
@@ -465,7 +469,7 @@ enum PopoverRenderHarness {
     /// desk margin — 432 for one column, 798 for two — not a fixed 432. The column plan is
     /// made from measured heights and lands a main-queue turn after the first layout, so the
     /// window is refitted once it has.
-    private static func snapshotPopover(store: UsageStore, dark: Bool, to url: URL) async -> Bool {
+    private static func snapshotPopover(store: UsageStore, dark: Bool, to url: URL, fixtureDate: Date? = nil) async -> Bool {
         let root = PopoverView(
             store: store, onOpenSettings: {},
             forceSolidSurface: CommandLine.arguments.contains("--solid-popover")
@@ -482,6 +486,7 @@ enum PopoverRenderHarness {
             // Direct environment override (not the scene-level `preferredColorScheme`
             // preference) so semantic styles resolve for the right scheme in this
             // offscreen hosting context.
+            .environment(\.loadingDate, fixtureDate)
             .environment(\.colorScheme, dark ? .dark : .light)
 
         let hosting = NSHostingView(rootView: root)

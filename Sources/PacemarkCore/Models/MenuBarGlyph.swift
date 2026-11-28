@@ -149,6 +149,17 @@ public struct MenuBarMeter: Sendable, Equatable {
     public let glyph: MenuBarGlyphKind
     public let badge: String?
     public let pace: MenuBarPace?
+    public let countdown: String?
+
+    public var accessibilityReading: String? {
+        guard let detail = summary.detail else { return nil }
+        guard !summary.isNeutral else { return "\(detail), no reading" }
+        let unit = summary.percentageMode == .used ? "used" : "left"
+        let amount = summary.text.replacingOccurrences(of: "%", with: " percent \(unit)")
+        let state = isLiveReading ? pace?.tier?.label.lowercased() : nil
+        return [detail, amount, state, countdown.map(Countdown.spokenReset)]
+            .compactMap { $0 }.joined(separator: ", ")
+    }
 
     public var expectedFill: Double? {
         pace?.expectedRemaining.map { summary.percentageMode == .used ? 1 - $0 : $0 }
@@ -156,7 +167,8 @@ public struct MenuBarMeter: Sendable, Equatable {
 
     public init(summary: MenuBarSummary, fill: Double?, awaitingFirstReading: Bool = false,
                 isLiveReading: Bool = false, sourceAccountKey: AccountKey? = nil,
-                glyph: MenuBarGlyphKind = .capsule, badge: String? = nil, pace: MenuBarPace? = nil) {
+                glyph: MenuBarGlyphKind = .capsule, badge: String? = nil, pace: MenuBarPace? = nil,
+                countdown: String? = nil) {
         self.summary = summary
         self.fill = fill
         self.awaitingFirstReading = awaitingFirstReading
@@ -165,5 +177,6 @@ public struct MenuBarMeter: Sendable, Equatable {
         self.glyph = glyph
         self.badge = badge
         self.pace = pace
+        self.countdown = countdown
     }
 }

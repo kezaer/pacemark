@@ -398,7 +398,7 @@ public struct APISpendRow<Mark: View, Waiting: View, AmountDecoration: ViewModif
             ProviderStyle.severityColor(for: .low, scheme: scheme)
         case .critical:
             // Text ink, not the bar fill — the badge is small type on the tile surface.
-            ProviderStyle.criticalText(scheme: scheme)
+            ProviderStyle.statusCriticalText(scheme: scheme)
         }
     }
 }

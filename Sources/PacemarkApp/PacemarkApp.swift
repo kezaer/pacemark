@@ -696,11 +696,13 @@ struct PacemarkApp: App {
     // ML1: `--bench-ui scene` measures `BenchSceneStandIn` (UIBenchHarness.swift), not this body.
     // Mirror a change to what this body reads or builds into the stand-in before measuring it.
     var body: some Scene {
+        let paceDate = DemoFixture.scenarioRequest() == .multiAccount(.paceStates) ? DemoFixture.paceStatesDate : nil
         MenuBarExtra {
             PopoverView(store: store, onOpenSettings: { openSettings() },
                         onOpenAPISpend: { openSettings(pane: .apiSpend) },
                         onOpenMenuBarSettings: { openSettings(pane: .menuBar) }, fitsMenuBarWindowHeight: true)
                 .defaultAppStorage(AppComposition.menuBarControlDefaults)
+                .environment(\.loadingDate, paceDate)
                 // PC1 (Kyle, 2026-09-23): on Tahoe the MenuBarExtra window draws its own
                 // Liquid Glass background behind the popover at the system's smaller corner
                 // radius, so a second corner and rim showed outside the r22 shell. The shell
@@ -761,6 +763,7 @@ struct PacemarkApp: App {
                 notificationClient: AppComposition.notificationClient
             )
             .defaultAppStorage(AppComposition.menuBarControlDefaults)
+            .environment(\.loadingDate, paceDate)
             .modifier(CapturedDemoLinks(isReplaying: store.isReplayingDemoCapture))
 
             // L9A (revising KTD2): the window opens at 800 × 700 and is resizable on
@@ -1081,6 +1084,9 @@ enum AppComposition {
             for key in [PopoverSummarySlot.firstKey, PopoverSummarySlot.secondKey] {
                 if let value = QALaunch.argument("-" + key, in: arguments) { defaults.set(value, forKey: key) }
             }
+            if DemoFixture.scenarioRequest(arguments: arguments) == .multiAccount(.paceStates) {
+                MenuBarMeterControls.seedMenuBarDemo(defaults: defaults, showNumber: true)
+            }
             return defaults
         }
         let request = DemoFixture.scenarioRequest(arguments: arguments)
@@ -1090,6 +1096,8 @@ enum AppComposition {
             let defaults = DemoMemoryDefaults()
             if request == .multiAccount(.menubar) {
                 MenuBarMeterControls.seedMenuBarDemo(defaults: defaults)
+            } else if request == .multiAccount(.paceStates) {
+                MenuBarMeterControls.seedMenuBarDemo(defaults: defaults, showNumber: true)
             }
             return defaults
         }
@@ -1221,6 +1229,8 @@ enum AppComposition {
         prefs.showMenuBarPercentage = true
         prefs.menuBarFillSource = .both            // show both Claude + Codex meters in the menu bar
         if scenario == .menubar { DemoFixture.applyMenuBarDemoPreferences(to: prefs) }
+        if scenario == .paceStates { DemoFixture.applyPaceStatesPreferences(to: prefs) }
+        let paceDate = scenario == .paceStates ? DemoFixture.paceStatesDate : nil
         // API spend surfaces are off by default, so enable exactly the ones this scenario
         // wires — derived from the providers rather than a hardcoded Claude/Codex pair, so
         // `spend-states`' xAI balance row is not silently filtered out of the card.
@@ -1272,7 +1282,7 @@ enum AppComposition {
             // `defaultLoginRecords.v1`. Fixture providers carry no identity, so no reader runs.
             defaultLoginRecords: fixture.makeDefaultLoginRecordStore(),
             bankedResetAcknowledgements: BankedResetAcknowledgements(defaults: prefsDefaults),
-            now: { [clock = controller?.clock] in clock?.now() ?? Date() },
+            now: { [clock = controller?.clock] in paceDate ?? clock?.now() ?? Date() },
             previewAccountLayout: prefs.accountLayout
         )
     }
@@ -1287,6 +1297,8 @@ enum AppComposition {
         for scenario: DemoFixture.MultiAccountScenario
     ) -> [any APISpendProvider] {
         switch scenario {
+        case .paceStates:
+            []
         case .spendStates:
             [
                 DemoSpendProvider(id: .claude, displayName: "Anthropic API", snapshot: DemoFixture.anthropicSpendKeyRejected),
@@ -1692,6 +1704,41 @@ private enum QALaunch {
         arguments.firstIndex(of: name).flatMap { arguments.dropFirst($0 + 1).first }
     }
 
+    private struct PaceStatusComparison: View {
+        let date: Date
+        @Environment(\.colorScheme) private var scheme
+
+        var body: some View {
+            let kind = WindowKind.fiveHour
+            let window = UsageWindow(kind: kind, utilization: 75, resetsAt: date.addingTimeInterval(9_000))
+            let pace = MenuBarPace(window: window, now: date)
+            let reading = UsageMeterReading(window: window)
+            PDSCard("Pace and status", accessory: { EmptyView() }) {
+                VStack(alignment: .leading, spacing: PDS.Space.m) {
+                    HStack(spacing: PDS.Space.s) {
+                        LedgerPaceBar(remaining: reading.fraction(for: .remaining), pace: pace,
+                                      severity: reading.severity ?? .healthy)
+                        Text("\(reading.roundedPercentage(for: .remaining) ?? 0)%")
+                            .font(PopoverLedgerType.value)
+                            .foregroundStyle(LedgerInk.usage(pace?.tier, fallback: reading.severity, scheme: scheme))
+                        PDSHelpText("Using very fast")
+                    }
+                    if let limit = UsageLimitSentence(snapshot: DemoFixture.opencodeLimitedSnapshot, now: date) {
+                        StatusSentence(text: limit.text, severity: .critical, indented: false)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, PDS.Space.s)
+                // Leave room for StatusSentence's optical leading adjustment.
+                .padding(.horizontal, PDS.Space.xs)
+            }
+            .frame(width: CGFloat(LedgerMetrics.columns.columnWidth))
+            .padding(PDS.Space.s)
+            // Compare the two production inks on a controlled plate in each appearance.
+            .background(scheme == .dark ? Color.black : .white)
+        }
+    }
+
     @MainActor static func run() {
         guard Bundle.main.bundleIdentifier == "org.pacemark.qa.fixture" else { exit(64) }
         if AppComposition.isTestHost(), DemoFixture.isEnabled {
@@ -1730,15 +1777,34 @@ private enum QALaunch {
             store.showMenuBarLabels = pose != "off"
         }
         controller.configure(store: store)
-        let appearance = NSAppearance(named: argument("--appearance") == "dark" ? .darkAqua : .aqua)
+        let dark = argument("--appearance") == "dark"
+        let increasedContrast = CommandLine.arguments.contains("--qa-increase-contrast")
+        let appearanceName: NSAppearance.Name = switch (dark, increasedContrast) {
+        case (true, true): .accessibilityHighContrastDarkAqua
+        case (false, true): .accessibilityHighContrastAqua
+        case (true, false): .darkAqua
+        case (false, false): .aqua
+        }
+        let appearance = NSAppearance(named: appearanceName)
+        if increasedContrast { app.appearance = appearance }
+
         let panel: NSPanel
-        if CommandLine.arguments.contains("--status-item") {
-            let dark = appearance?.name == .darkAqua
+        if CommandLine.arguments.contains("--qa-pace-status-comparison") {
+            let host = NSHostingController(rootView: PaceStatusComparison(date: fixtureDate))
+            panel = CapturePanel(contentViewController: host)
+            panel.styleMask = [.borderless, .nonactivatingPanel]
+            panel.title = "QA Popover"
+        } else if CommandLine.arguments.contains("--status-item") {
             // The virtual display has no system status bar. Model its button inset around the production label.
             let view = MenuBarStatusLabel(store: store, appearanceOverride: dark)
                 .defaultAppStorage(AppComposition.launchDefaults)
+                .transformEnvironment(\._colorSchemeContrast) { if increasedContrast { $0 = .increased } }
                 .padding(.horizontal, MenuBarGaugeRenderer.meterGap / 2)
-                .background(.selection.opacity(0.3), in: Capsule())
+                .background {
+                    if DemoFixture.scenarioRequest() != .multiAccount(.paceStates) {
+                        Capsule().fill(.selection.opacity(0.3))
+                    }
+                }
                 .padding(PDS.Space.s)
             panel = CapturePanel(contentViewController: NSHostingController(rootView: view))
             panel.styleMask = [.borderless, .nonactivatingPanel]
@@ -1749,7 +1815,8 @@ private enum QALaunch {
             panel.styleMask = [.borderless, .nonactivatingPanel]
             panel.title = "QA Gallery"
         } else if CommandLine.arguments.contains("--popover") {
-            panel = PopoverTuningModel.pinnedPanel(store: store, fixtureDate: fixtureDate)
+            panel = PopoverTuningModel.pinnedPanel(store: store, fixtureDate: fixtureDate,
+                                                  qaIncreasedContrast: increasedContrast)
             panel.title = "QA Popover"
         } else {
             guard let pane = SettingsPane(rawValue: argument("--pane") ?? "general") else { exit(64) }
@@ -1781,7 +1848,7 @@ private enum QALaunch {
         let backdrop = NSPanel(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel],
                                backing: .buffered, defer: false)
         backdrop.title = "QA Backdrop"
-        backdrop.backgroundColor = appearance?.name == .darkAqua ? NSColor(white: 0.13, alpha: 1)
+        backdrop.backgroundColor = dark ? NSColor(white: 0.13, alpha: 1)
             : NSColor(white: 0.91, alpha: 1)
         backdrop.isOpaque = true
         backdrop.hasShadow = false

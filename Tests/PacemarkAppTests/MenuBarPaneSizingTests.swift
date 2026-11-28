@@ -67,9 +67,9 @@ struct MenuBarPaneSizingTests {
         tuning.iconSize = iconSize
         let renderer = MenuBarGaugeRenderer(palette: MenuBarPalette(isDarkMenuBar: true), tuning: tuning)
         let date = Date()
-        let pace = MenuBarPace(usedFraction: 0.25, duration: 100, reset: date.addingTimeInterval(55), now: date)
-        let meter = MenuBarMeter(summary: .init(text: "75%", providerID: .claude, detail: nil, isNeutral: false),
-                                 fill: 0.75, isLiveReading: true, pace: pace)
+        let pace = MenuBarPace(usedFraction: 0.45, duration: 100, reset: date.addingTimeInterval(55), now: date)
+        let meter = MenuBarMeter(summary: .init(text: "55%", providerID: .claude, detail: nil, isNeutral: false),
+                                 fill: 0.55, isLiveReading: true, pace: pace)
         let layout = MeterLegendLayout(renderer: renderer, meter: meter)
         #expect(abs(layout.numberFont.pointSize / layout.ring.diameter - 0.50) < 0.0001)
         for (index, rect) in layout.badges.enumerated() {
@@ -77,6 +77,15 @@ struct MenuBarPaneSizingTests {
             #expect(!rect.intersects(layout.number))
             #expect(layout.badges.dropFirst(index + 1).allSatisfy { !rect.intersects($0) })
         }
+    }
+
+    @Test func fivePaceSamplesAndTwoReadingStatesFitTheLegendCard() {
+        let legend = MenuBarMeterLegend(tuning: .defaults, date: Date()).frame(width: 488)
+        let host = NSHostingController(rootView: legend)
+        let size = host.sizeThatFits(in: CGSize(width: 488, height: 700))
+        #expect(size.width == 488)
+        #expect(size.height > 2 * PDS.Metrics.row)
+        #expect(size.height < SettingsView.minimumWindowHeight - 2 * PDS.Space.xl)
     }
 
     @Test func numberAndLabelBandUseTheRenderedMeters() {

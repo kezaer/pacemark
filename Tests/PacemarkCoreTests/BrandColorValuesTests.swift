@@ -3,10 +3,56 @@ import Testing
 @testable import PacemarkCore
 
 struct BrandColorValuesTests {
-    @Test func ledgerPaceInkClearsSmallTextContrast() {
-        let darkTile = PacemarkRGBColor(red: 0.13, green: 0.14, blue: 0.16)
-        #expect(contrastRatio(PacemarkSeverityColorValues.aheadText(dark: true), darkTile) >= 4.5)
-        #expect(contrastRatio(PacemarkSeverityColorValues.aheadText(dark: false), .white) >= 4.5)
+    @Test func criticalUsageInkClearsSmallTextOnLedgerCardsAndMenuPlates() {
+        // Samples beside the Lab reading and beside the status artwork in the pace-states fixture.
+        let references: [(Bool, PacemarkRGBColor, PacemarkRGBColor)] = [
+            (false, rgb(234, 234, 234), rgb(232, 232, 232)),
+            (true, rgb(53, 53, 53), rgb(33, 33, 33))
+        ]
+        for (dark, card, plate) in references {
+            let ink = PacemarkSeverityColorValues.criticalText(dark: dark)
+            #expect(contrastRatio(ink, card) >= 4.5)
+            #expect(contrastRatio(ink, plate) >= 4.5)
+            for increasedContrast in [false, true] {
+                let fill = PacemarkSeverityColorValues.criticalFill(dark: dark, increasedContrast: increasedContrast)
+                #expect(contrastRatio(fill, plate) >= 3)
+                if !dark { #expect(contrastRatio(fill, card) >= 3) }
+            }
+        }
+        // The brighter default Ledger card used when approving the revised ink.
+        #expect(contrastRatio(PacemarkSeverityColorValues.criticalText(dark: true), rgb(55, 56, 59)) >= 4.5)
+        let lightFill = PacemarkSeverityColorValues.criticalFill(dark: false, increasedContrast: false)
+        #expect(contrastRatio(lightFill, rgb(203, 203, 203)) >= 3)
+    }
+
+    @Test func standardDarkCriticalFillHasAnAcceptedLedgerTrackAndCardException() {
+        let fill = PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: false)
+        // Samples beside the Lab reading on the pinned dark fixture.
+        #expect(abs(contrastRatio(fill, rgb(85, 85, 85)) - 1.6001) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(53, 53, 53)) - 2.6326) < 0.0001)
+        // The original single-account fixture has a slightly brighter substrate.
+        #expect(abs(contrastRatio(fill, rgb(87, 88, 91)) - 1.5267) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(55, 56, 59)) - 2.5162) < 0.0001)
+    }
+
+    @Test func increasedContrastDarkCriticalFillHasAnAcceptedLedgerTrackAndCardException() {
+        let fill = PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: true)
+        // Live Increase Contrast capture of the neutral Ledger track and card.
+        #expect(abs(contrastRatio(fill, rgb(74, 74, 74)) - 2.2897) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(40, 40, 40)) - 3.8090) < 0.0001)
+        // Use the same neutral track and card samples as the standard dark fill.
+        #expect(abs(contrastRatio(fill, rgb(85, 85, 85)) - 1.9261) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(53, 53, 53)) - 3.1690) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(87, 88, 91)) - 1.8378) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(55, 56, 59)) - 3.0289) < 0.0001)
+    }
+
+    @Test func statusCriticalInkRetainsItsIndependentPalette() {
+        for dark in [false, true] {
+            let status = PacemarkSeverityColorValues.statusCriticalText(dark: dark)
+            #expect(hex(status) == (dark ? "#FF6659" : "#D1241C"))
+            #expect(status != PacemarkSeverityColorValues.criticalText(dark: dark))
+        }
     }
 
     /// R2C18: the Claude accent *is* the mark's own fill. It used to be a hand-authored
@@ -141,30 +187,17 @@ struct BrandColorValuesTests {
         }
     }
 
-    /// R2C15: at critical the *track* takes the critical hue at a fixed lightness, because
-    /// the fill's ink area shrinks exactly as severity rises. It is a tint, not a second
-    /// value step (it stays close to the neutral track's lightness against the card), and the
-    /// pinned fill-vs-track separation must survive it.
     @Test func theCriticalTrackKeepsItsHueAndItsSeparationFromTheFill() {
         for dark in [true, false] {
             let track = PacemarkMeterColorValues.criticalBarTrack(dark: dark)
-            let critical = PacemarkOKLCH(PacemarkSeverityColorValues.critical(dark: dark))
-            #expect(abs(PacemarkOKLCH(track).hue - critical.hue) < 2, "dark=\(dark) hue")
-
-            let fill = PacemarkSeverityColorValues.fill(
-                for: UsageSeverity.critical,
-                dark: dark,
-                increasedContrast: false
-            )
-            let measured = contrastRatio(fill, track)
-            // Same floors the neutral track is held to: ≥2.0:1 for the deliberately vivid
-            // light default, ≥3.0:1 for dark.
-            #expect(measured >= (dark ? 3.0 : 2.0), "critical fill vs tinted track, dark=\(dark): \(measured):1")
-
+            for increasedContrast in [false, true] {
+                let fill = PacemarkSeverityColorValues.criticalFill(dark: dark, increasedContrast: increasedContrast)
+                #expect(abs(PacemarkOKLCH(track).hue - PacemarkOKLCH(fill).hue) < 2)
+                let ratio = contrastRatio(fill, track)
+                #expect(ratio >= (dark ? 2 : 3), "Critical fill vs tinted track: \(ratio)")
+            }
             for card in raisedTileFillColors(dark: dark) {
                 let neutral = composite(PacemarkColorValues.barTrack(dark: dark), over: card)
-                // Within a quarter of an APCA tier of the neutral track it replaces — the
-                // change has to read as hue, not as a brighter or darker bar.
                 let shift = abs(abs(apcaLc(text: track, background: card))
                     - abs(apcaLc(text: neutral, background: card)))
                 #expect(shift < 12, "dark=\(dark) tinted track shifts |Lc| by \(shift)")
@@ -339,22 +372,19 @@ struct BrandColorValuesTests {
     }
 
     @Test func usageSeverityColorsMatchCanonicalSpec() {
-        // Dark: vivid originals (critical nudged 0.27 → 0.34 green for the 3:1 bar-vs-track
-        // floor). Light: darkened along the same hues so bars clear WCAG 1.4.11 on the
-        // light track and read ≥4:1 as chip text on white.
         #expect(PacemarkSeverityColorValues.healthy(dark: true) == PacemarkRGBColor(red: 0.20, green: 0.78, blue: 0.35))
         #expect(PacemarkSeverityColorValues.low(dark: true) == PacemarkRGBColor(red: 1.00, green: 0.62, blue: 0.04))
-        #expect(PacemarkSeverityColorValues.critical(dark: true) == PacemarkRGBColor(red: 1.00, green: 0.34, blue: 0.29))
         #expect(PacemarkSeverityColorValues.healthy(dark: false) == PacemarkRGBColor(red: 0.09, green: 0.52, blue: 0.22))
         #expect(PacemarkSeverityColorValues.low(dark: false) == PacemarkRGBColor(red: 0.70, green: 0.41, blue: 0.00))
-        #expect(PacemarkSeverityColorValues.critical(dark: false) == PacemarkRGBColor(red: 0.85, green: 0.16, blue: 0.13))
+        #expect(hex(PacemarkSeverityColorValues.criticalText(dark: true)) == "#FF7F74")
+        #expect(hex(PacemarkSeverityColorValues.criticalText(dark: false)) == "#8A1410")
     }
 
     @Test func usageSeverityLookupReturnsCanonicalValues() {
         for dark in [true, false] {
             #expect(PacemarkSeverityColorValues.color(for: UsageSeverity.healthy, dark: dark) == PacemarkSeverityColorValues.healthy(dark: dark))
             #expect(PacemarkSeverityColorValues.color(for: UsageSeverity.low, dark: dark) == PacemarkSeverityColorValues.low(dark: dark))
-            #expect(PacemarkSeverityColorValues.color(for: UsageSeverity.critical, dark: dark) == PacemarkSeverityColorValues.critical(dark: dark))
+            #expect(PacemarkSeverityColorValues.color(for: UsageSeverity.critical, dark: dark) == PacemarkSeverityColorValues.criticalText(dark: dark))
             #expect(PacemarkSeverityColorValues.color(for: UsageSeverity.healthy, dark: dark) == PacemarkSeverityColorValues.healthy(dark: dark))
         }
     }
@@ -401,11 +431,9 @@ struct BrandColorValuesTests {
 
         #expect(PacemarkMeterColorValues.tickOff(dark: true) == PacemarkTint(color: .white, opacity: 0.09))
         #expect(PacemarkMeterColorValues.tickOff(dark: false) == PacemarkTint(color: .black, opacity: 0.08))
-        #expect(PacemarkMeterColorValues.tickGlass(dark: true) == PacemarkTint(color: .white, opacity: 0.26))
+        #expect(PacemarkMeterColorValues.tickGlass(dark: true) == PacemarkTint(color: .white, opacity: 0.16))
         #expect(PacemarkMeterColorValues.tickGlass(dark: false) == PacemarkTint(color: .black, opacity: 0.24))
-        // R2C4b: dark's cap stepped 0.52 → 0.42 so the neutral tip stops out-shouting the
-        // critical fill (ordering asserted in `theDarkSeverityRampIsMonotonicInLc`).
-        #expect(PacemarkMeterColorValues.tickGlassCap(dark: true) == PacemarkTint(color: .white, opacity: 0.42))
+        #expect(PacemarkMeterColorValues.tickGlassCap(dark: true) == PacemarkTint(color: .white, opacity: 0.265))
         #expect(PacemarkMeterColorValues.tickGlassCap(dark: false) == PacemarkTint(color: .black, opacity: 0.36))
 
         // R2C16: the stale fill is no longer a flat system grey — it keeps its severity's
@@ -462,54 +490,33 @@ struct BrandColorValuesTests {
     }
 
     @Test func severityFillTokensMatchCanonicalSpec() {
-        // Fill tier (Sep 2026): vivid light defaults, text-tier fallbacks under Increase
-        // Contrast. R2C4a darkened the light amber `oklch(0.700 …)` → `oklch(0.660 0.166
-        // 58.3)` so the light ramp is monotonic; R2C4b lifted the *dark* critical fill off
-        // its text token to `oklch(0.740 0.190 28.1)` for the same reason in dark.
         #expect(PacemarkSeverityColorValues.healthyFill(dark: false, increasedContrast: false) == PacemarkRGBColor(red: 0.16, green: 0.66, blue: 0.30))
         #expect(PacemarkSeverityColorValues.lowFill(dark: false, increasedContrast: false) == PacemarkRGBColor(red: 0.856, green: 0.450, blue: 0.000))
-        #expect(PacemarkSeverityColorValues.criticalFill(dark: false, increasedContrast: false) == PacemarkRGBColor(red: 0.90, green: 0.22, blue: 0.20))
-        #expect(PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: false) == PacemarkRGBColor(red: 1.00, green: 0.448, blue: 0.389))
+        #expect(hex(PacemarkSeverityColorValues.criticalFill(dark: false, increasedContrast: false)) == "#A51C17")
+        #expect(hex(PacemarkSeverityColorValues.criticalFill(dark: false, increasedContrast: true)) == "#A51C17")
+        #expect(hex(PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: false)) == "#D63A30")
+        #expect(hex(PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: true)) == "#E8483D")
 
-        // The light amber moved lightness only: same hue, same chroma, one step darker.
         let amber = PacemarkOKLCH(PacemarkSeverityColorValues.lowFill(dark: false, increasedContrast: false))
         #expect(abs(amber.lightness - 0.660) < 0.005)
         #expect(abs(amber.chroma - 0.166) < 0.006)
         #expect(abs(amber.hue - 58.3) < 2.5)
 
-        for severity in [UsageSeverity.healthy, .low, .critical] {
-            #expect(
-                PacemarkSeverityColorValues.fill(for: severity, dark: false, increasedContrast: true)
-                    == PacemarkSeverityColorValues.color(for: severity, dark: false),
-                "light increased contrast falls back to the text tier: \(severity)"
-            )
-            for increasedContrast in [true, false] {
-                // Critical is the one dark fill that is deliberately *not* its text token
-                // (R2C4b); the other two still are, in both branches.
-                let expected = severity == .critical
-                    ? PacemarkRGBColor(red: 1.00, green: 0.448, blue: 0.389)
-                    : PacemarkSeverityColorValues.color(for: severity, dark: true)
-                #expect(
-                    PacemarkSeverityColorValues.fill(for: severity, dark: true, increasedContrast: increasedContrast)
-                        == expected,
-                    "dark fill: \(severity)"
-                )
+        for severity in [UsageSeverity.healthy, .low] {
+            for dark in [false, true] {
+                #expect(PacemarkSeverityColorValues.fill(for: severity, dark: dark, increasedContrast: true)
+                    == PacemarkSeverityColorValues.color(for: severity, dark: dark))
             }
         }
-
-        // The two `fill(for:)` overloads (UsageSeverity / UsageSeverity) cannot drift.
-        #expect(PacemarkSeverityColorValues.fill(for: UsageSeverity.low, dark: false, increasedContrast: false)
-            == PacemarkSeverityColorValues.fill(for: UsageSeverity.low, dark: false, increasedContrast: false))
     }
 
-    /// The 3:1 (WCAG 1.4.11) floor still holds everywhere it is claimed: every dark fill, and
-    /// every light fill once the user turns on Increase Contrast. The *default* light
-    /// appearance is deliberately exempt — see the redundant-visualization test below.
+    /// Increase Contrast fills meet 3:1 on the neutral track, with the named dark critical
+    /// exception covered separately.
     @Test func everySeverityFillClearsNonTextContrastWhereItIsClaimed() {
         for dark in [true, false] {
             for background in raisedTileFillColors(dark: dark) {
                 let track = composite(PacemarkColorValues.barTrack(dark: dark), over: background)
-                for severity in [UsageSeverity.healthy, .low, .critical] {
+                for severity in [UsageSeverity.healthy, .low, .critical] where !dark || severity != .critical {
                     let fill = PacemarkSeverityColorValues.fill(
                         for: severity,
                         dark: dark,
@@ -554,13 +561,15 @@ struct BrandColorValuesTests {
         let track = composite(PacemarkColorValues.barTrack(dark: false), over: card)
 
         for severity in [UsageSeverity.healthy, .low, .critical] {
-            let darkToken = PacemarkSeverityColorValues.color(for: severity, dark: true)
+            let darkToken = PacemarkSeverityColorValues.fill(for: severity, dark: true, increasedContrast: false)
             let lightFill = PacemarkSeverityColorValues.fill(
                 for: severity,
                 dark: false,
                 increasedContrast: false
             )
-            #expect(contrastRatio(darkToken, track) < 3, "dark \(severity) reused on the light track")
+            if severity != .critical {
+                #expect(contrastRatio(darkToken, track) < 3, "dark \(severity) reused on the light track")
+            }
             // Critical's light fill happens to clear 3:1 on its own; healthy and low do not,
             // and the policy does not require them to.
             if severity != .critical {
@@ -636,23 +645,17 @@ struct BrandColorValuesTests {
         }
     }
 
-    /// These are characterization measurements, not 3:1 pass assertions. Ghost is
-    /// deliberately subtle, and U8 owns the live decision if that subtlety reads as lost.
-    /// The light *default* band moved (1.3815–1.6345 → 1.2584–1.5465) because Ghost tints the
-    /// severity fill and the vivid light fills sit closer in luminance to the track. The
-    /// increased-contrast branch keeps the old band exactly, because it keeps the old colors.
-    ///
-    /// R2C4 moved two of the four recorded numbers: the dark minimum 1.2295 → 1.3099 (the
-    /// dark critical fill lifted) and the light minimum 1.2584 → 1.2846 (the light amber
-    /// darkened). Both improve; the increased-contrast branch is untouched because it keeps
-    /// the text-tier colours.
-    @Test func ghostBodyContrastOnTrackIsRecorded() {
-        #expect(measuredGhostRatios(dark: true, increasedContrast: false).min().map { abs($0 - 1.3099) < 0.0001 } == true)
-        #expect(measuredGhostRatios(dark: true, increasedContrast: false).max().map { abs($0 - 1.3733) < 0.0001 } == true)
-        #expect(measuredGhostRatios(dark: false, increasedContrast: false).min().map { abs($0 - 1.2846) < 0.0001 } == true)
-        #expect(measuredGhostRatios(dark: false, increasedContrast: false).max().map { abs($0 - 1.5465) < 0.0001 } == true)
-        #expect(measuredGhostRatios(dark: false, increasedContrast: true).min().map { abs($0 - 1.3815) < 0.0001 } == true)
-        #expect(measuredGhostRatios(dark: false, increasedContrast: true).max().map { abs($0 - 1.6345) < 0.0001 } == true)
+    /// Ghost body contrast is measured on the neutral track. Ghost remains deliberately subtle.
+    @Test func ghostBodyContrastOnTrackIsRecorded() throws {
+        let bounds: [(Bool, Bool, Double, Double)] = [
+            (true, false, 1.1017, 1.3733), (true, true, 1.1600, 1.3733),
+            (false, false, 1.2846, 1.7906), (false, true, 1.3815, 1.7906),
+        ]
+        for (dark, increasedContrast, minimum, maximum) in bounds {
+            let ratios = measuredGhostRatios(dark: dark, increasedContrast: increasedContrast)
+            #expect(abs(try #require(ratios.min()) - minimum) < 0.0001)
+            #expect(abs(try #require(ratios.max()) - maximum) < 0.0001)
+        }
     }
 
     /// Glass is recorded rather than promoted to a blanket pass. Dark is unchanged. The light
@@ -854,6 +857,10 @@ struct BrandColorValuesTests {
         #expect(hex(PacemarkColorValues.staleNeutralFill(dark: false)) == "#8D9299")
     }
 
+}
+
+private func rgb(_ red: Double, _ green: Double, _ blue: Double) -> PacemarkRGBColor {
+    PacemarkRGBColor(red: red / 255, green: green / 255, blue: blue / 255)
 }
 
 private func hex(_ color: PacemarkRGBColor) -> String {

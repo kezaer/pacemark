@@ -12,15 +12,22 @@ struct MenuBarGlyphTests {
         #expect(MenuBarAccountBadge.sanitize("  ") == nil)
     }
 
-    @Test func tickUsesTheSameQuotaDirectionAsTheGaugeFill() throws {
-        let now = Date()
-        let pace = try #require(MenuBarPace(usedFraction: 0.3, duration: 100, reset: now.addingTimeInterval(75), now: now))
-        func meter(_ mode: UsagePercentageMode) -> MenuBarMeter {
-            MenuBarMeter(summary: .init(text: "", providerID: .codex, detail: nil, isNeutral: false,
-                                        percentageMode: mode), fill: nil, pace: pace)
-        }
-        #expect(meter(.remaining).expectedFill == 0.75)
-        #expect(meter(.used).expectedFill == 0.25)
+    @Test(arguments: UsagePercentageMode.allCases)
+    func tickAndSpokenPaceFollowTheReadingInEitherPercentageMode(mode: UsagePercentageMode) throws {
+        let now = Date(timeIntervalSinceReferenceDate: 0)
+        let pace = try #require(MenuBarPace(usedFraction: 0.15, duration: 100, reset: now.addingTimeInterval(75), now: now))
+        let summary = MenuBarSummary(text: mode == .used ? "15%" : "85%", providerID: .codex,
+                                     detail: "Codex Weekly", isNeutral: false, percentageMode: mode)
+        let meter = MenuBarMeter(summary: summary, fill: nil, isLiveReading: true, pace: pace, countdown: "3d")
+        #expect(meter.expectedFill == (mode == .used ? 0.25 : 0.75))
+        #expect(meter.accessibilityReading == (mode == .used
+            ? "Codex Weekly, 15 percent used, using slowly, resets in 3 days"
+            : "Codex Weekly, 85 percent left, using slowly, resets in 3 days"))
+
+        let unknown = MenuBarMeter(summary: summary, fill: nil, isLiveReading: true)
+        #expect(unknown.expectedFill == nil)
+        #expect(unknown.accessibilityReading == (mode == .used
+            ? "Codex Weekly, 15 percent used" : "Codex Weekly, 85 percent left"))
     }
 
     @Test func refreshingOneSubscriptionDoesNotAnimateTheOtherAccountsPill() {

@@ -42,18 +42,26 @@ struct MenuBarPaletteTests {
         }
     }
 
-    /// The dark branch stayed byte-identical to the palette that shipped pinned through L1A.
-    ///
-    /// R2C4b moves exactly one of the three: the vessel reads the severity *fill* tier, and
-    /// the dark critical fill lifted `oklch(0.683 …)` → `oklch(0.740 0.190 28.1)` so the dark
-    /// severity ramp is monotonic in |Lc|. The menu bar inherits that on purpose — a brighter
-    /// critical vessel is the right direction on the one always-visible surface — but it is a
-    /// visible change to the plate, so it is pinned here rather than left to drift.
-    @Test func darkLiquidMatchesThePreviouslyPinnedDarkPalette() {
-        let palette = MenuBarPalette(isDarkMenuBar: true)
-        #expect(palette.liquid(for: .healthy) == PacemarkRGBColor(red: 0.20, green: 0.78, blue: 0.35))
-        #expect(palette.liquid(for: .low) == PacemarkRGBColor(red: 1.00, green: 0.62, blue: 0.04))
-        #expect(palette.liquid(for: .critical) == PacemarkRGBColor(red: 1.00, green: 0.448, blue: 0.389))
+    @Test func lightIncreaseContrastDarkensHealthyAndLowFills() {
+        let standard = MenuBarPalette(isDarkMenuBar: false)
+        let increased = MenuBarPalette(isDarkMenuBar: false, increasedContrast: true)
+        for severity in [UsageSeverity.healthy, .low] {
+            #expect(increased.liquid(for: severity)
+                == PacemarkSeverityColorValues.fill(for: severity, dark: false, increasedContrast: true))
+            #expect(standard.liquid(for: severity) != increased.liquid(for: severity))
+        }
+        #expect(standard.liquid(for: .critical) == increased.liquid(for: .critical))
+    }
+
+    @Test func darkLiquidAppliesIncreaseContrastToCriticalOnly() {
+        let standard = MenuBarPalette(isDarkMenuBar: true)
+        let increased = MenuBarPalette(isDarkMenuBar: true, increasedContrast: true)
+        for severity in [UsageSeverity.healthy, .low] {
+            #expect(standard.liquid(for: severity) == increased.liquid(for: severity))
+        }
+        #expect(standard.liquid(for: .critical) == PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: false))
+        #expect(increased.liquid(for: .critical) == PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: true))
+        #expect(standard.severityInk(for: .critical) == increased.severityInk(for: .critical))
     }
 
     /// Severity *ink* is the text tier. On a dark menu bar it parts from the fill tier only at

@@ -52,6 +52,26 @@ struct LedgerSummaryTile: View {
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        switch tile {
+        case .tightest(let reading), .nextReset(let reading):
+            let window = reading.candidate.window
+            let readingMode: UsagePercentageMode = tile.slot == .tightest ? mode : .remaining
+            let amount = UsageMeterReading(window: window).roundedPercentage(for: readingMode)
+            let unit = readingMode == .used ? "used" : "left"
+            let spoken = [
+                tile.slot == .tightest ? "Tightest" : tile.slot.label,
+                reading.candidate.key.providerID.displayName, reading.candidate.title,
+                window.displayLabel ?? LedgerRowRecipe.column(for: window.kind),
+                amount.map { "\($0) percent \(unit)" }, reading.pace.tier?.label.lowercased(),
+                reading.countdown.map(Countdown.spokenReset), reading.projection?.emptyLine
+            ].compactMap { $0 }.joined(separator: ", ")
+            card.accessibilityElement(children: .ignore).accessibilityLabel(spoken)
+        case .apiSpend:
+            card
+        }
+    }
+
+    private var card: some View {
         PDSCard(accessory: { EmptyView() }) {
             VStack(alignment: .leading, spacing: PDS.Space.xs) {
                 HStack(alignment: .firstTextBaseline, spacing: PDS.Space.xs) {
@@ -72,18 +92,19 @@ struct LedgerSummaryTile: View {
                 case .tightest(let reading):
                     let window = reading.candidate.window
                     let amount = UsageMeterReading(window: window).roundedPercentage(for: mode)
-                    let palette = MenuBarPalette(isDarkMenuBar: scheme == .dark)
-                    let ink = reading.pace.tier == .ahead ? LedgerInk.pace(.ahead, scheme: scheme)
-                        : Color(nsColor: palette.severityInk(for: reading.pace.tier?.severity ?? window.severity).menuBarColor)
+                    let fallback = UsageMeterReading(window: window).severity
+                    let band = reading.pace.tier?.severity ?? fallback
+                    let ink = band == .healthy ? ProviderStyle.severityColor(for: .healthy, scheme: scheme)
+                        : LedgerInk.usage(reading.pace.tier, fallback: fallback, scheme: scheme)
                     value(amount.map { "\($0)%" } ?? "—", unit: mode == .used ? "used" : "left", ink: ink)
-                    paceBar(reading)
+                    paceBar(reading, mode: mode)
                     footnote(reading.tightestCaption)
                         .ledgerResetHelp(deadline: window.resetSchedule.deadline, window: window, now: now)
                 case .nextReset(let reading):
                     value(reading.countdown ?? "—")
                         .ledgerResetHelp(deadline: reading.candidate.window.resetSchedule.deadline,
                                          window: reading.candidate.window, now: now)
-                    paceBar(reading)
+                    paceBar(reading, mode: .remaining)
                     footnote(reading.nextResetCaption)
                 case .apiSpend(let snapshots):
                     value(spend(snapshots))
@@ -96,10 +117,11 @@ struct LedgerSummaryTile: View {
         }
     }
 
-    private func paceBar(_ reading: PopoverSummaryRecipe.Reading) -> some View {
+    private func paceBar(_ reading: PopoverSummaryRecipe.Reading, mode: UsagePercentageMode) -> some View {
         GeometryReader { proxy in
             LedgerPaceBar(remaining: reading.pace.remaining, pace: reading.pace,
-                          severity: reading.candidate.window.severity, width: proxy.size.width)
+                          severity: UsageMeterReading(window: reading.candidate.window).severity ?? .healthy,
+                          width: proxy.size.width, mode: mode)
                 .frame(maxHeight: .infinity)
         }.frame(height: PDS.Space.s)
     }

@@ -48,7 +48,7 @@ func drive(_ pid: pid_t, _ args: [String], _ window: String?) throws {
         let title = string($0, kAXTitleAttribute)
         return title == "QA \(window?.capitalized ?? "Settings")" || (window == nil && title == "QA Popover")
     }) else { throw Failure("QA window unavailable") }
-    if args == ["check"] { try checkLayout(root); return }
+    if args == ["check"] { try checkLayout(root, statusItem: window == "status"); return }
     let target = args.first == "select-pane" ? "pane." + (args.dropFirst().first ?? "") : args.dropFirst().first
     var match: AXUIElement?
     walk(root) { node, depth in

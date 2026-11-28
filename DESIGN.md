@@ -40,10 +40,14 @@ Add a token when an existing role cannot express a need shared by multiple views
    `scheme:`. Don't use `.secondary`/`.tertiary` for text on cards; use
    `ProviderStyle.secondaryText`/`tertiaryText` (system tertiary measures ~2.3:1 on a dark tile).
    Brand values are OKLCH stops, and contrast is asserted in `BrandColorValuesTests`.
-4. **One meaning per colour.** Severity colours (green >50% remaining, amber ≤50%, red ≤15%;
-   see `UsageSeverity`) indicate usage level. V11 and Ledger indicate pace when the window
-   has reset evidence and fall back to usage level otherwise. Account/lifecycle states use neutral ink.
-   Red is reserved for a provider refusal (`StatusSentenceSeverity.critical`).
+4. **One meaning per colour.** The Ledger and menu bar compare displayed remaining quota
+   with the pace tick for live windows with a known future reset and duration. Either
+   direction uses green within 5 percentage points, yellow up to 15 points, and red beyond
+   15 points. Without pace evidence, green means above 50% left, yellow means above 15%
+   through 50%, and red means 15% or less. Both dark critical fills have accepted contrast
+   exceptions on the neutral track and Ledger card. The numeral has its own contrast-checked ink.
+   Account and lifecycle states use neutral ink. Provider refusals, limit-reached sentences
+   and spend alerts retain their separate critical status ink.
 5. **Things that look the same behave the same.** A filled, outlined chip is *state*; a flat
    pill is a *metadata label* (`IdentityCapsuleStyle`). Every text button has a resting
    container; bare glyph buttons only in toolbar/title rows.
@@ -82,7 +86,7 @@ All paths are under `Sources/`.
 | Popover shell | `PopoverCardMetrics` (`PopoverView.swift`) | Shell width 384, margin 19, card width derived from them. `shellWidth(columns:)` is 384 for one column and 750 for two (two cards plus the 20pt gap); `cardsHeightCap` 640 is where one column becomes two, and where two columns scroll. With Scroll vertically, `verticalCardsHeightCap` scrolls at the screen's free height less `popoverChromeHeight`, at most 900 (a 300 guard covers a bad screen reading). |
 | Popover columns | Core `AccountColumnsPlanner` (`Models/AccountColumnsPlan.swift`) → `PopoverPlanModel` → `PopoverColumnsLayout` | Card pad 13, card gap 20, account gap 26 (Standard) or 4 (Compact). Never more than two columns. |
 | Compact account row | `PacemarkApp/UI/CompactAccountRow.swift` (`CompactAccountRow`, `CompactCardHeader`), decided by Core `CompactAccountRowRecipe` | Approved 2026-10-13: row 26, rows 4 apart, title 13 semibold, cells 84 wide and 12 apart, cell numeral 15 semibold, no per-cell label. One `CompactCardHeader` per card (26pt: 11pt tertiary "5h left"/"wk used" right-aligned over each number column, the provider name over the account names, one hairline) repeats in each column a split card occupies. Meters draw as the Micro twin of the user's style. A Standard section among Compact rows sits 11pt further out each side. |
-| Ledger account row and summary | `PacemarkApp/UI/Ledger/`: `LedgerMetrics`, `PopoverLedgerType`, `LedgerAccountRow`, `LedgerSummaryStrip`. Decisions in Core `LedgerRowRecipe` and `PopoverSummaryRecipe`. | 36pt rows with a 70pt pace bar and monospaced percentage and reset columns. Expanded rows list the account’s individual windows. Optional summaries use the same pace bar for quota. Amber text uses `PacemarkSeverityColorValues.aheadText`. Ledger sections use `PDSCard`. Fixed-height summary tiles share `PDSCardSurface`. |
+| Ledger account row and summary | `PacemarkApp/UI/Ledger/`: `LedgerMetrics`, `PopoverLedgerType`, `LedgerAccountRow`, `LedgerSummaryStrip`. Decisions in Core `LedgerRowRecipe` and `PopoverSummaryRecipe`. | 36pt rows with a 70pt pace bar and monospaced percentage and reset columns. Expanded rows list the account’s individual windows. Optional summaries use the same pace bar for quota. Pace numerals use `PDS.Ink` warning and critical tokens. Ledger sections use `PDSCard`. Fixed-height summary tiles share `PDSCardSurface`. |
 | Provider card | `PacemarkApp/UI/ProviderCardView.swift`, `PacemarkSharedUI/IdentityRow.swift`, `PacemarkSharedUI/IdentityCapsule.swift` (`IdentityRowMetrics`) | Card: `.padding(13)` + `.raisedTile(cornerRadius: 10)`. Identity row: mark slot 15, gap 6, title 15 semibold / −0.15 kern, capsule height 18, capsule label 10.5 medium / +0.2 kern. |
 | Capsules & chips | `PacemarkSharedUI/IdentityCapsule.swift`: `IdentityCapsuleStyle`, `.identityCapsule(fill:horizontalPadding:border:)` | Metadata fill 0.12, stale fill 0.18, state border 0.35 @ 1pt. |
 | Setup cards | `SetupCardMetrics`, `ClaudeSetupStyle`, `CodexSetupStyle` | Gaps 6 / 12 / 20. Body 12.5, notes 11. The two provider enums stay decoupled by design; their numbers live in `PacemarkBrandRamp`. |

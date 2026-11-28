@@ -2,20 +2,54 @@ import Foundation
 
 /// The remaining quota and its pace against a known reset interval.
 public struct MenuBarPace: Sendable, Equatable {
+    public enum Direction: Sendable, Equatable {
+        case fast, slow
+    }
+
     public enum Tier: Sendable, Equatable {
-        case onPace, ahead, wayAhead
+        case onPace
+        case offPace(Direction)
+        case farOffPace(Direction)
 
         public var severity: UsageSeverity {
             switch self {
             case .onPace: .healthy
-            case .ahead: .low
-            case .wayAhead: .critical
+            case .offPace: .low
+            case .farOffPace: .critical
             }
         }
+
+        public var direction: Direction? {
+            switch self {
+            case .onPace: nil
+            case .offPace(let direction), .farOffPace(let direction): direction
+            }
+        }
+
+        public var label: String {
+            switch self {
+            case .onPace: "On pace"
+            case .offPace(.fast): "Using fast"
+            case .offPace(.slow): "Using slowly"
+            case .farOffPace(.fast): "Using very fast"
+            case .farOffPace(.slow): "Using very slowly"
+            }
+        }
+
+        public var isOffPace: Bool { direction != nil }
     }
 
     public let remaining: Double
     public let expectedRemaining: Double?
+    /// Displayed remaining minus expected remaining, in tenths of a percentage point.
+    public let deviationTenths: Int?
+
+    public var direction: Direction? {
+        guard let deviationTenths, deviationTenths != 0 else { return nil }
+        return deviationTenths < 0 ? .fast : .slow
+    }
+
+    public var isOffPace: Bool { tier?.isOffPace == true }
 
     /// Unknown reset evidence leaves the tier unset so the meter can use its normal severity.
     public let tier: Tier?
@@ -23,41 +57,49 @@ public struct MenuBarPace: Sendable, Equatable {
     public init?(usedFraction: Double, duration: TimeInterval?, reset: Date?, now: Date) {
         guard usedFraction.isFinite else { return nil }
         let used = min(1, max(0, usedFraction))
-        remaining = 1 - used
-        let elapsed: Double?
-        if let duration, duration.isFinite, duration > 0,
-           let timeToReset = reset?.timeIntervalSince(now), timeToReset.isFinite {
-            elapsed = min(1, max(0, (duration - timeToReset) / duration))
-        } else {
-            elapsed = nil
-        }
-
-        expectedRemaining = elapsed.map { 1 - $0 }
-        if used == 1 {
-            tier = .wayAhead
-        } else if let elapsed {
-            tier = Self.tier(used: used, elapsed: elapsed)
-        } else {
-            tier = nil
-        }
+        guard let displayed = UsageDisplayValue(usedFraction: used) else { return nil }
+        self.init(usedFraction: used, displayed: displayed, duration: duration, reset: reset, now: now)
     }
 
-    private static func tier(used: Double, elapsed: Double) -> Tier {
-        // Before 10% of the window elapses, a small amount of usage can skew the projection.
-        if elapsed < 0.10 {
-            if used > elapsed + 0.35 { return .wayAhead }
-            if used > elapsed + 0.15 { return .ahead }
-            return .onPace
+    private init(usedFraction: Double, displayed: UsageDisplayValue, duration: TimeInterval?, reset: Date?, now: Date) {
+        remaining = 1 - usedFraction
+        let expected: UsageDisplayValue?
+        if let duration, duration.isFinite, duration > 0,
+           let timeToReset = reset?.timeIntervalSince(now), timeToReset.isFinite {
+            let timeLeft = min(duration, max(0, timeToReset))
+            let fraction = timeLeft / duration
+            expectedRemaining = fraction
+            // Scale before dividing so 1,899 seconds of 18,000 yields exactly 10.55%.
+            let scaledTime = timeLeft * 100
+            expected = UsageDisplayValue(
+                percentRemaining: scaledTime.isFinite ? scaledTime / duration : fraction * 100
+            )
+        } else {
+            expectedRemaining = nil
+            expected = nil
         }
-        let projectedUsedAtReset = used / elapsed
-        if projectedUsedAtReset > 1.30 { return .wayAhead }
-        if projectedUsedAtReset > 1.00 { return .ahead }
-        return .onPace
+
+        guard let expected else {
+            deviationTenths = nil
+            tier = nil
+            return
+        }
+
+        let delta = Int((displayed.percentRemaining * 10).rounded())
+            - Int((expected.percentRemaining * 10).rounded())
+        deviationTenths = delta
+        let direction: Direction = delta < 0 ? .fast : .slow
+        switch abs(delta) {
+        case ...50: tier = .onPace
+        case ...150: tier = .offPace(direction)
+        default: tier = .farOffPace(direction)
+        }
     }
 
     public init?(window: UsageWindow, now: Date) {
-        self.init(usedFraction: window.utilization / 100, duration: Self.duration(for: window.kind),
-                  reset: window.resetSchedule.deadline, now: now)
+        guard let displayed = UsageDisplayValue(window: window) else { return nil }
+        self.init(usedFraction: min(1, max(0, window.utilization / 100)), displayed: displayed,
+                  duration: Self.duration(for: window.kind), reset: window.resetSchedule.deadline, now: now)
     }
 
     public static func duration(for kind: WindowKind) -> TimeInterval? {

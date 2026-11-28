@@ -12,6 +12,12 @@ struct CountdownTests {
         #expect(text(after: 37 * 60) == "Resets in 37m")
     }
 
+    @Test func spokenResetJoinsUnitsAndPreservesUnknownCopy() {
+        #expect(Countdown.spokenReset("1d 2h") == "resets in 1 day and 2 hours")
+        #expect(Countdown.spokenReset("2h 1m") == "resets in 2 hours and 1 minute")
+        #expect(Countdown.spokenReset("later today") == "later today")
+    }
+
     @Test func immediateResetCopyStartsAtTheSourceBoundary() {
         #expect(text(after: 61) == "Resets in 1m")
         #expect(text(after: 60) == "Resets now")

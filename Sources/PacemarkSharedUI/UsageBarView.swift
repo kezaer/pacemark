@@ -744,7 +744,7 @@ public struct UsageBarView: View {
     /// live critical numeral red rather than merely secondary.
     private var numeralInk: AnyShapeStyle {
         if usesCriticalInk {
-            AnyShapeStyle(ProviderStyle.criticalText(scheme: scheme))
+            AnyShapeStyle(ProviderStyle.severityColor(for: .critical, scheme: scheme))
         } else if isEffectivelyDimmed {
             AnyShapeStyle(.secondary)
         } else {

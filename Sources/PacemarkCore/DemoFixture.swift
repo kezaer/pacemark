@@ -4,6 +4,7 @@ public enum DemoFixture {
     public static let qaDate: Date? = CommandLine.arguments.contains("--qa-display")
         ? Date(timeIntervalSince1970: 1_800_000_000) : nil
     public static var now: Date { qaDate ?? Date() }
+    public static let paceStatesDate = Date(timeIntervalSince1970: 1_800_000_000)
 
     /// Hosted tests must remain inert even when Xcode omits scheme launch arguments.
     public static var isEnabled: Bool {
@@ -460,6 +461,7 @@ extension DemoFixture {
         case multiTwo = "multi-2"
         case multiThree = "multi-3"
         case menubar
+        case paceStates = "pace-states"
         case multiFive = "multi-5"
         /// Popover account layout plan: the reported case, 7 Claude + 1 Codex, which needs a
         /// second column (Standard) or the Compact rows to fit without scrolling.
@@ -770,6 +772,45 @@ extension DemoFixture {
         }
     }
 
+    private struct PaceStateDemoReading {
+        let account: ProviderAccount
+        let badge: String
+        let meterKind: WindowKind
+        let limits: [(kind: WindowKind, used: Double)]
+    }
+
+    private static let paceStates: [PaceStateDemoReading] = {
+        func account(_ provider: ProviderID, _ label: String, id: AccountID = .primary) -> ProviderAccount {
+            ProviderAccount(id: id, providerID: provider, label: label, isBuiltIn: id == .primary)
+        }
+        let monthly = WindowKind.billingPeriod(label: "Monthly", duration: 30 * 86_400)
+        return [
+            .init(account: account(.claude, "Personal"), badge: "ON",
+                  meterKind: .fiveHour, limits: [(.fiveHour, 50), (.weekly, 48)]),
+            .init(account: account(.claude, "Work", id: AccountID("pace-work")), badge: "F1",
+                  meterKind: .weekly, limits: [(.fiveHour, 60), (.weekly, 59)]),
+            .init(account: account(.codex, "Studio"), badge: "S1",
+                  meterKind: .weekly, limits: [(.fiveHour, 40), (.weekly, 41)]),
+            .init(account: account(.codex, "Lab", id: AccountID("pace-lab")), badge: "F2",
+                  meterKind: .fiveHour, limits: [(.fiveHour, 78), (.weekly, 76)]),
+            .init(account: account(.grok, "Billing"), badge: "S2",
+                  meterKind: monthly, limits: [(monthly, 20)]),
+        ]
+    }()
+
+    public static func applyPaceStatesPreferences(to preferences: Preferences) {
+        let providers: [ProviderID] = [.claude, .codex, .grok]
+        preferences.menuBarProviderOrder = providers
+        preferences.menuBarMeterSelection = MenuBarMeterSelection(items: paceStates.map { reading in
+            .init(account: reading.account.key, window: .limit(reading.meterKind.persistentID), label: reading.badge)
+        })
+        for provider in providers {
+            if let surface = UsageSurface.subscription(for: provider) {
+                preferences.setSurfaceEnabled(true, for: surface)
+            }
+        }
+    }
+
     public static func multiFixture(for scenario: MultiAccountScenario, includesLedgerDetails: Bool = false) -> MultiAccountFixture {
         var pairs: [(account: ProviderAccount, provider: any UsageProvider)] = []
         switch scenario {
@@ -813,6 +854,19 @@ extension DemoFixture {
                     id: provider, displayName: provider.displayName, snapshot: snapshot, accountID: account.id,
                     // The crowded bar has two synthetic Antigravity accounts; the real provider stays single-account.
                     accountCapacityOverride: provider == .antigravity ? 2 : nil))
+            }
+        case .paceStates:
+            pairs = paceStates.map { reading in
+                let account = reading.account
+                let windows = reading.limits.map { kind, utilization in
+                    let halfWindow = (MenuBarPace.duration(for: kind) ?? 0) / 2
+                    return UsageWindow(kind: kind, utilization: utilization,
+                                       resetsAt: paceStatesDate.addingTimeInterval(halfWindow))
+                }
+                let snapshot = UsageSnapshot(providerID: account.providerID, windows: windows, planLabel: nil,
+                                             capturedAt: paceStatesDate, freshness: .live)
+                return (account, DemoUsageProvider(id: account.providerID, displayName: account.providerID.displayName,
+                                                   snapshot: snapshot, accountID: account.id))
             }
         case .multiFive:
             pairs = [

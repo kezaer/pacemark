@@ -431,44 +431,26 @@ public enum PacemarkMeterColorValues {
             : PacemarkTint(color: .black, opacity: 0.08)
     }
 
-    /// PA1: the segmented neutral body — same mirror as `glassA`.
+    /// Dark neutral segments stay quieter than the deep critical fill.
     public static func tickGlass(dark: Bool) -> PacemarkTint {
-        PacemarkTint(color: dark ? .white : .black, opacity: dark ? 0.26 : 0.24)
+        PacemarkTint(color: dark ? .white : .black, opacity: dark ? 0.16 : 0.24)
     }
 
-    /// PA1: the segmented neutral *tip*. Deliberately heavier than the body in both schemes —
-    /// it is a one-cell end marker, not the fill's weight.
-    ///
-    /// R2C4b: dark stepped 0.52 → 0.42. PA1's exemption said the cap "is exempt and stays
-    /// exempt"; measured, dark's 0.52 cap read |Lc| ≈ 50 against a 41–43 critical fill, so a
-    /// fully healthy grey meter's tip out-shouted a critical red meter's. The exemption was
-    /// the ordering bug, not a licence for it. At 0.42 the cap still clears its own body
-    /// (|Lc| ≈ 40 vs 25–27) and now sits under critical, and the whole dark ramp is monotonic:
-    /// body < cap < critical < healthy < low. Light's 0.36 already ordered correctly.
+    /// The end segment retains a distinct lightness step over the body.
     public static func tickGlassCap(dark: Bool) -> PacemarkTint {
-        PacemarkTint(color: dark ? .white : .black, opacity: dark ? 0.42 : 0.36)
+        PacemarkTint(color: dark ? .white : .black, opacity: dark ? 0.265 : 0.36)
     }
 
-    /// R2C15: the bar track at `.critical` only.
-    ///
-    /// Severity's ink area shrinks exactly as severity rises — at 9% left the alarm colour
-    /// owns ~5pt of a bar while a comfortable 74% paints a wide neutral one. The track is the
-    /// surface that does not shrink, so at critical it carries the hue the fill no longer can,
-    /// at constant OKLCH lightness (`oklch(0.905 0.045 28.1)` light / `oklch(0.391 0.055
-    /// 28.1)` dark, the critical hue) so it reads as a tint rather than a second value step.
-    /// The pinned fill-vs-track separation barely moves (light 3.22 → 3.14:1, dark 3.58 →
-    /// 3.67:1) and `BrandColorValuesTests` asserts both. Fires at critical only; the machined
-    /// well keeps its own recessed background.
+    /// The compatibility meter's tinted track stays close to the neutral track in lightness
+    /// and shares the standard critical fill's hue.
     public static func criticalBarTrack(dark: Bool) -> PacemarkRGBColor {
-        PacemarkOKLCH(
+        let fill = PacemarkSeverityColorValues.criticalFill(dark: dark, increasedContrast: false)
+        return PacemarkOKLCH(
             lightness: dark ? 0.391 : 0.905,
             chroma: dark ? 0.055 : 0.045,
-            hue: criticalHue
+            hue: PacemarkOKLCH(fill).hue
         ).rgb
     }
-
-    /// The critical family's OKLCH hue, measured from `PacemarkSeverityColorValues.critical`.
-    private static let criticalHue: Double = 28.1
 
     /// How much of the severity *fill* survives in the Hue ramp's start stop (the rest is
     /// mixed toward white in light, black in dark).
@@ -476,9 +458,8 @@ public enum PacemarkMeterColorValues {
     /// Light retuned 0.55 → 0.75 alongside the vivid fill tier: the default light fills are
     /// lighter than the text-tier values the 0.55 mix was set against, so a 45% white mix
     /// washed the start into the track (amber 1.27:1, was 1.55:1). At 0.75 every light start
-    /// matches or beats its previous separation (1.59 / 1.69 / 2.27:1). Under Increase
-    /// Contrast the fills revert to the text tier, so the mix reverts with them and the ramp
-    /// renders exactly as it does today.
+    /// matches or beats its previous separation. Increase Contrast uses more white in the
+    /// light start stop so the deeper fills still fade across the track.
     public static func rampStartSeverityMix(
         dark: Bool,
         surface: MeterRampSurface,
@@ -570,11 +551,7 @@ public enum PacemarkMeterColorValues {
         dark ? 0.11 : 0.14
     }
 
-    /// Opacity applied to the severity *fill* token for the Ghost body. Left at the round-6
-    /// values through the fill split: the vivid light fills lower the recorded body-vs-track
-    /// separation slightly (1.38–1.63 → 1.26–1.55), and Ghost is deliberately subtle, so this
-    /// stays a characterized measurement rather than a chased number. `BrandColorValuesTests`
-    /// records both branches.
+    /// Ghost uses the current severity fill at deliberately low contrast.
     public static func ghostBodyOpacity(for severity: UsageSeverity, dark: Bool) -> Double {
         switch (dark, severity) {
         case (true, .critical): 0.22
@@ -684,16 +661,7 @@ public enum PacemarkBrandMark {
     }
 }
 
-/// Two tiers of severity color (Sep 2026 policy change — see `…Fill` below).
-///
-/// **Text tier** — `healthy/low/critical(dark:)` and `criticalText(dark:)`. The dark values
-/// are the vivid originals (tuned for dark cards); the light values are darkened along the
-/// same hues so severity *ink* reads ≥4:1 on white. Dark critical is nudged (0.27 → 0.34
-/// green) for the 3:1 bar-vs-track floor; dark healthy/low already passed and are untouched.
-/// Every text, icon, and pill use stays on this tier. Values are unchanged by the fill split.
-///
-/// **Fill tier** — `healthyFill/lowFill/criticalFill(dark:increasedContrast:)`, what a meter
-/// bar paints. See that tier's own note below.
+/// Scheme-paired usage fills and inks. Critical status sentences use their own ink.
 public enum PacemarkSeverityColorValues {
     public static func healthy(dark: Bool) -> PacemarkRGBColor {
         dark ? PacemarkRGBColor(red: 0.20, green: 0.78, blue: 0.35) : PacemarkRGBColor(red: 0.09, green: 0.52, blue: 0.22)
@@ -703,59 +671,19 @@ public enum PacemarkSeverityColorValues {
         dark ? PacemarkRGBColor(red: 1.00, green: 0.62, blue: 0.04) : PacemarkRGBColor(red: 0.70, green: 0.41, blue: 0.00)
     }
 
-    public static func critical(dark: Bool) -> PacemarkRGBColor {
-        dark ? PacemarkRGBColor(red: 1.00, green: 0.34, blue: 0.29) : PacemarkRGBColor(red: 0.85, green: 0.16, blue: 0.13)
-    }
-
-    /// Critical severity rendered as *text*, decoupled from the bar fill (H3a, Jul 2026
-    /// multi-account design review). The chipless multi-account meter paints the percentage
-    /// numeral critical instead of showing the "Low" chip, so the numeral becomes AA-legible
-    /// body text rather than a bar fill — a separate token because the fill red fails at text
-    /// size. WCAG contrast for 18pt-semibold numerals (relative luminance L, ratio
-    /// (L_light+0.05)/(L_dark+0.05)):
-    /// - Dark = (1.00,0.40,0.35), L≈0.315, on the composite dark card #2C2C2E (L≈0.025)
-    ///   → 4.85:1. The raw fill red (1.00,0.34,0.29) lands at only ~4.45:1 there, so it is
-    ///   brightened (green 0.34→0.40, blue 0.29→0.35) until it clears ≥4.5:1.
-    /// - Light = (0.82,0.14,0.11), L≈0.149, on white → 5.28:1 and across the light card fill
-    ///   (L≈0.87 bottom … 0.97 top) ≥4.6:1. The raw fill red (0.85,0.16,0.13) passes on pure
-    ///   white (4.9:1) but dips to ~4.3:1 on the card's darker lower fill, so it is darkened
-    ///   (0.85→0.82 R, 0.16→0.14 G, 0.13→0.11 B) to hold ≥4.5:1 over the whole surface.
+    /// Usage numerals need more contrast than the bar fill.
     public static func criticalText(dark: Bool) -> PacemarkRGBColor {
-        dark ? PacemarkRGBColor(red: 1.00, green: 0.40, blue: 0.35) : PacemarkRGBColor(red: 0.82, green: 0.14, blue: 0.11)
+        dark ? PacemarkRGBColor(red: 1, green: 127.0 / 255, blue: 116.0 / 255)
+            : PacemarkRGBColor(red: 138.0 / 255, green: 20.0 / 255, blue: 16.0 / 255)
     }
 
+    /// Provider refusals, limit-reached sentences and spend alerts retain their existing ink.
+    public static func statusCriticalText(dark: Bool) -> PacemarkRGBColor {
+        dark ? PacemarkRGBColor(red: 1.00, green: 0.40, blue: 0.35)
+            : PacemarkRGBColor(red: 0.82, green: 0.14, blue: 0.11)
+    }
 
-    // MARK: - Fill tier
-    //
-    // What a meter bar paints, split from the text tier in Sep 2026 by product decision.
-    //
-    // In the *default* light appearance these are vivid — close to the dark tokens in feel —
-    // and they deliberately sit below WCAG 1.4.11's 3:1 non-text floor against the light bar
-    // track (measured 2.06–3.22:1, worst case low/amber over the darker card fill). That is a
-    // considered choice, not an oversight: the percent numeral beside every bar already states
-    // the value at full text contrast, so the bar is a redundant visualization rather than the
-    // sole carrier of the information the guideline protects.
-    //
-    // Two things keep it accessible:
-    //   1. every *text*, icon, and pill use stays on the text tier above (unchanged), and
-    //   2. when the user turns on Increase Contrast, the light fills fall back to the text
-    //      tier's darkened values, which clear 3:1 on the track (3.15–3.61:1). The dark fills
-    //      are the dark text-tier values in both branches — they already pass (3.06–4.63:1) —
-    //      except critical, which R2C4b lifted off the text token to make the dark severity
-    //      ramp monotonic; it passes by more (3.58–4.19:1), not less.
-    //
-    // Why a split instead of a retune: no vivid light fill can clear 3:1 on the light track on
-    // its own. The track is black @ 0.12 over a near-white card (L≈0.745), so a 3:1 fill has to
-    // sit at L ≤ 0.215 — darker than any saturated sRGB orange (rgb(0.96,0.58,0.05) is L≈0.41).
-    // Deepening the track makes it *worse*, not better: these mid-luminance fills are darker
-    // than the track, so a darker track converges on them (at 0.18 alpha the amber falls to
-    // 1.46:1). The light track therefore stays at 0.12.
-    //
-    // Light default values were tuned down from the brief's starting points only where the
-    // ≥2.0:1-vs-track / ≥2.5:1-vs-card policy floor required it: amber
-    // (0.96,0.58,0.05) → (0.91,0.50,0.02) (1.70 → 2.06 vs track); green and red pass as given.
-    // `BrandColorValuesTests` pins every ratio.
-
+    // Light green and amber use their deeper ink values as fills under Increase Contrast.
     public static func healthyFill(dark: Bool, increasedContrast: Bool) -> PacemarkRGBColor {
         guard !dark else { return healthy(dark: true) }
         return increasedContrast
@@ -777,19 +705,12 @@ public enum PacemarkSeverityColorValues {
             : PacemarkRGBColor(red: 0.856, green: 0.450, blue: 0.000)
     }
 
-    /// R2C4b: the dark fill is the one severity fill that is *not* its text token. The dark
-    /// text critical (`oklch(0.683 0.206 28.1)`) measured |Lc| 41–43 against the card, below
-    /// the neutral `tickGlassCap`, so a healthy grey meter's tip out-shouted a critical red
-    /// meter's. `oklch(0.740 0.190 28.1)` lifts it to 47–49, above the retuned cap and below
-    /// healthy. The honest limit: |Lc| cannot put red above amber in dark without
-    /// desaturating it, which is fine — AP1 already gives critical a second channel (the red
-    /// numeral). Separation vs the track improves too (3.06 → 3.58:1), so the 3:1 floor the
-    /// dark fills claim still holds in both the default and Increase Contrast branches.
     public static func criticalFill(dark: Bool, increasedContrast: Bool) -> PacemarkRGBColor {
-        guard !dark else { return PacemarkRGBColor(red: 1.00, green: 0.448, blue: 0.389) }
+        guard dark else {
+            return PacemarkRGBColor(red: 165.0 / 255, green: 28.0 / 255, blue: 23.0 / 255)
+        }
         return increasedContrast
-            ? critical(dark: false)
-            : PacemarkRGBColor(red: 0.90, green: 0.22, blue: 0.20)
+            ? PacemarkRGBColor(red: 232.0 / 255, green: 72.0 / 255, blue: 61.0 / 255)
+            : PacemarkRGBColor(red: 214.0 / 255, green: 58.0 / 255, blue: 48.0 / 255)
     }
-
 }

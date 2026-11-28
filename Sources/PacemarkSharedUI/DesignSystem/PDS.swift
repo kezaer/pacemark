@@ -31,7 +31,7 @@ public enum PDS {
       scheme == .dark ? Color(red: 1, green: 0.77, blue: 0.43) : Color(red: 0.48, green: 0.25, blue: 0)
     }
     public static func paceCritical(_ scheme: ColorScheme) -> Color {
-      scheme == .dark ? Color(red: 1, green: 0.76, blue: 0.75) : Color(red: 0.68, green: 0.10, blue: 0.08)
+      ProviderStyle.severityColor(for: .critical, scheme: scheme)
     }
     public static let disabledText = Color.primary.opacity(0.68)
     public static let separator = Color.primary.opacity(0.20),

@@ -22,8 +22,11 @@ import Foundation
 public struct MenuBarPalette: Sendable, Equatable {
     public let isDarkMenuBar: Bool
 
-    public init(isDarkMenuBar: Bool) {
+    public let increasedContrast: Bool
+
+    public init(isDarkMenuBar: Bool, increasedContrast: Bool = false) {
         self.isDarkMenuBar = isDarkMenuBar
+        self.increasedContrast = increasedContrast
     }
 
     /// The menu bar's label color — what every other status item's ink matches. White on a
@@ -41,23 +44,14 @@ public struct MenuBarPalette: Sendable, Equatable {
         PacemarkTint(color: ink.color, opacity: ink.opacity * 0.62)
     }
 
-    /// What the vessel's liquid — and the needs-sign-in dot — paint: the severity **fill**
-    /// tier for this appearance.
-    ///
-    /// The menu bar has no SwiftUI environment, so Increase Contrast is not consulted here;
-    /// the vivid light fills are the L1A design, and the numeral beside each vessel carries
-    /// the accessible reading.
+    /// The gauge fill follows the menu bar appearance and Increase Contrast.
     public func liquid(for severity: UsageSeverity) -> PacemarkRGBColor {
-        PacemarkSeverityColorValues.fill(for: severity, dark: isDarkMenuBar, increasedContrast: false)
+        PacemarkSeverityColorValues.fill(
+            for: severity, dark: isDarkMenuBar, increasedContrast: increasedContrast
+        )
     }
 
-    /// A severity rendered as *ink* — the percentage numeral when the window is low or
-    /// critical, and the numeral beside a provider that needs sign-in. This is the text tier,
-    /// which parts from the fill tier at critical because the fill red fails at numeral size.
     public func severityInk(for severity: UsageSeverity) -> PacemarkRGBColor {
-        switch severity {
-        case .critical: PacemarkSeverityColorValues.criticalText(dark: isDarkMenuBar)
-        case .low, .healthy: PacemarkSeverityColorValues.color(for: severity, dark: isDarkMenuBar)
-        }
+        PacemarkSeverityColorValues.color(for: severity, dark: isDarkMenuBar)
     }
 }

@@ -7,6 +7,7 @@ import PacemarkCore
 
 struct PopoverSettingsPane: View {
     let store: UsageStore
+    @Environment(\.colorScheme) private var scheme
     @Environment(\.loadingDate) private var pinnedDate
     private let fixture = SettingsPreviewFixtures()
 
@@ -51,7 +52,10 @@ struct PopoverSettingsPane: View {
         }
         .frame(width: CGFloat(LedgerMetrics.columns.columnWidth))
         .padding(PDS.Space.s)
-        .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: PDS.Radius.card))
+        .overlay {
+            // An extra wash beneath the sample cards makes the dark usage numerals harder to read.
+            RoundedRectangle(cornerRadius: PDS.Radius.card).strokeBorder(PDS.Ink.cardStroke)
+        }
         .environment(\.accountTitleInk, store.accountTitleInk)
         .allowsHitTesting(false)
         .accessibilityElement(children: .contain)
@@ -75,12 +79,16 @@ struct PopoverSettingsPane: View {
 
     @ViewBuilder
     private func percentageSample(_ mode: UsagePercentageMode) -> some View {
-        if let window = fixture.entries.first?.snapshot.windows.first(where: { $0.kind == .weekly }),
+        if let window = fixture.entries
+            .first(where: { $0.account.providerID == .codex })?.snapshot.windows.first(where: { $0.kind == .weekly }),
            let pace = MenuBarPace(window: window, now: fixture.now) {
+            let reading = UsageMeterReading(window: window)
             HStack(spacing: PDS.Space.xs) {
-                LedgerPaceBar(remaining: pace.remaining, pace: pace, severity: window.severity, width: 32, mode: mode)
-                Text("\(UsageMeterReading(window: window).roundedPercentage(for: mode) ?? 0)%")
+                LedgerPaceBar(remaining: pace.remaining, pace: pace, severity: reading.severity ?? .healthy,
+                              width: 32, mode: mode)
+                Text("\(reading.roundedPercentage(for: mode) ?? 0)%")
                     .font(PopoverLedgerType.value).fixedSize()
+                    .foregroundStyle(LedgerInk.usage(pace.tier, fallback: reading.severity, scheme: scheme))
                 Text(mode == .used ? "Used" : "Left").font(PopoverLedgerType.unit)
             }
         }

@@ -6,17 +6,19 @@ struct MenuBarStatusLabel: View {
     let store: UsageStore
     var appearanceOverride: Bool?
     private var controls = MenuBarMeterControls()
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         let _ = BenchCounters.hit("MenuBarStatusLabel")
         let tuning = controls.tuning
         let meters = store.menuBarMeters
         let renderer = MenuBarGaugeRenderer(
-            palette: MenuBarPalette(isDarkMenuBar: appearanceOverride ?? MenuBarAppearanceMonitor.shared.isDarkMenuBar),
+            palette: MenuBarPalette(
+                isDarkMenuBar: appearanceOverride ?? MenuBarAppearanceMonitor.shared.isDarkMenuBar,
+                increasedContrast: contrast == .increased
+            ),
             tuning: tuning)
-        let description = meters.compactMap { meter in
-            meter.summary.detail.map { "\($0): \(meter.summary.text)" }
-        }.joined(separator: ", ")
+        let description = meters.compactMap(\.accessibilityReading).joined(separator: ". ")
         Image(nsImage: renderer.image(meters: meters))
             .accessibilityLabel(description.isEmpty ? "Pacemark" : description)
     }

@@ -190,21 +190,24 @@ public struct LedgerRowRecipe: Sendable, Equatable {
         }
         func rank(_ tier: MenuBarPace.Tier?) -> Int {
             switch tier {
-            case .wayAhead: 2
-            case .ahead: 1
+            case .farOffPace: 2
+            case .offPace: 1
             case .onPace, nil: 0
             }
         }
         let firstRank = rank(first.pace?.tier)
         let secondRank = rank(second.pace?.tier)
         if firstRank != secondRank { return firstRank > secondRank }
-        if let firstPace = first.pace, let secondPace = second.pace,
-           let firstExpected = firstPace.expectedRemaining, let secondExpected = secondPace.expectedRemaining {
-            let firstGap = firstExpected - firstPace.remaining
-            let secondGap = secondExpected - secondPace.remaining
-            if firstGap != secondGap { return firstGap > secondGap }
-        }
-        return first.value.window.percentRemaining < second.value.window.percentRemaining
+        let firstIsFast = first.pace?.direction == .fast
+        let secondIsFast = second.pace?.direction == .fast
+        if firstIsFast != secondIsFast { return firstIsFast }
+        let firstGap = abs(first.pace?.deviationTenths ?? 0)
+        let secondGap = abs(second.pace?.deviationTenths ?? 0)
+        if firstGap != secondGap { return firstGap > secondGap }
+        let firstRemaining = first.value.window.percentRemaining
+        let secondRemaining = second.value.window.percentRemaining
+        if firstRemaining != secondRemaining { return firstRemaining < secondRemaining }
+        return first.value.window.kind.persistentID < second.value.window.kind.persistentID
     }
 
     /// Compact labels share the pace column with the section heading.

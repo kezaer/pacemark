@@ -34,7 +34,7 @@ public enum StatusSentenceSeverity {
     public func ink(scheme: ColorScheme) -> AnyShapeStyle {
         switch self {
         case .attention: AnyShapeStyle(ProviderStyle.meterLabelInk(scheme: scheme))
-        case .critical: AnyShapeStyle(ProviderStyle.criticalText(scheme: scheme))
+        case .critical: AnyShapeStyle(ProviderStyle.statusCriticalText(scheme: scheme))
         case .progress: AnyShapeStyle(Color.secondary)
         case .neutral: AnyShapeStyle(.secondary)
         case .quiet: AnyShapeStyle(.tertiary)

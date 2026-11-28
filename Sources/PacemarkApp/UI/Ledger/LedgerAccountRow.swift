@@ -282,7 +282,7 @@ struct LedgerAccountRow: View {
         let tier = window.pace?.tier
         let amount = percentage.map { "\($0) percent \(percentageMode == .used ? "used" : "left")" } ?? "no reading"
         let spokenReading = [
-            window.detailLabel, amount, window.countdown,
+            window.detailLabel, amount, tier?.label.lowercased(), window.countdown.map(Countdown.spokenReset),
             window.bankedResets.map { BankedCreditDetails.tip(count: $0, details: snapshot.bankedCreditDetails, now: now) }
         ].compactMap { $0 }.joined(separator: ", ")
         return HStack(spacing: LedgerMetrics.rowGap) {
@@ -300,7 +300,7 @@ struct LedgerAccountRow: View {
             Text(percentage.map { "\($0)%" } ?? "—")
                 .font(PopoverLedgerType.value)
                 .foregroundStyle(muted ? PDS.Ink.inkTertiary :
-                    tier == .ahead || tier == .wayAhead ? LedgerInk.pace(tier, scheme: scheme) : .primary)
+                    LedgerInk.usage(tier, fallback: UsageMeterReading(window: window.value.window).severity, scheme: scheme))
                 .contentTransition(PacemarkMotion.numericText(value: Double(percentage ?? 0), reduceMotion: reduceMotion))
                 .animation(PacemarkMotion.resolved(PacemarkMotion.valueSpring, .movement, reduceMotion: reduceMotion),
                            value: percentage)
@@ -327,7 +327,9 @@ struct LedgerAccountRow: View {
 
     private func paceBar(_ window: LedgerRowRecipe.Window, dimmed: Bool) -> some View {
         let remaining = window.value.displayedPercentage == nil ? 0 : window.value.window.percentRemaining / 100
-        return LedgerPaceBar(remaining: remaining, pace: window.pace, severity: window.value.window.severity, dimmed: dimmed, mode: window.value.displayedPercentage == nil ? .remaining : percentageMode)
+        let severity = UsageMeterReading(window: window.value.window).severity ?? .healthy
+        return LedgerPaceBar(remaining: remaining, pace: window.pace, severity: severity,
+                             dimmed: dimmed, mode: window.value.displayedPercentage == nil ? .remaining : percentageMode)
     }
 
     private struct Recovery {
@@ -415,11 +417,13 @@ enum LedgerStatusClock {
 }
 
 enum LedgerInk {
-    static func pace(_ tier: MenuBarPace.Tier?, scheme: ColorScheme) -> Color {
-        switch tier {
-        case .ahead: PDS.Ink.paceWarning(scheme)
-        case .wayAhead: PDS.Ink.paceCritical(scheme)
-        case .onPace, nil: PDS.Ink.inkTertiary
+    static func usage(_ tier: MenuBarPace.Tier?, fallback: UsageSeverity?, scheme: ColorScheme) -> Color {
+        let severity = if let tier { tier.isOffPace ? tier.severity : .healthy } else { fallback }
+        return switch severity {
+        case .low: PDS.Ink.paceWarning(scheme)
+        case .critical: PDS.Ink.paceCritical(scheme)
+        case .healthy: .primary
+        case nil: PDS.Ink.inkTertiary
         }
     }
 }

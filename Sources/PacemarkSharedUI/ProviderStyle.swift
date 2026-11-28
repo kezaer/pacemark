@@ -249,11 +249,8 @@ public enum ProviderStyle {
         Color(PacemarkSeverityColorValues.color(for: severity, dark: scheme == .dark))
     }
 
-    /// Meter-bar fill tier: vivid in the default light appearance, falling back to the
-    /// text-tier (3:1-passing) values under Increase Contrast. Callers read
-    /// `\.colorSchemeContrast` at the SwiftUI boundary — the Core token stays a pure Bool
-    /// so both branches are testable. Only bars, caps, segments, and ramps use this;
-    /// numerals, icons, and the "Low" pill stay on `severityColor(for:scheme:)`.
+    /// Meter fills for the current appearance. SwiftUI callers provide the
+    /// `colorSchemeContrast` preference so the token remains testable in Core.
     public static func severityFill(
         for severity: UsageSeverity,
         scheme: ColorScheme,
@@ -266,10 +263,8 @@ public enum ProviderStyle {
         ))
     }
 
-    /// Critical-as-text ink (H3a), decoupled from the bar fill so the chipless multi-account
-    /// numeral clears WCAG AA at 18pt semibold. See `PacemarkSeverityColorValues.criticalText`.
-    public static func criticalText(scheme: ColorScheme) -> Color {
-        Color(PacemarkSeverityColorValues.criticalText(dark: scheme == .dark))
+    public static func statusCriticalText(scheme: ColorScheme) -> Color {
+        Color(PacemarkSeverityColorValues.statusCriticalText(dark: scheme == .dark))
     }
 
     public static func symbol(for id: ProviderID) -> String {

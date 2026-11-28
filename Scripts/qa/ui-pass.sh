@@ -1,6 +1,11 @@
 #!/bin/bash
 set -eu
-out=${1:?Usage: ui-pass.sh output-directory}
+out=${1:?Usage: ui-pass.sh output-directory [--pace-states]}
+mode=${2:-}
+if [[ -n "$mode" && "$mode" != --pace-states ]]; then
+    echo 'Usage: ui-pass.sh output-directory [--pace-states]' >&2
+    exit 64
+fi
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
 if [[ -e "$out/index.html" ]]; then
@@ -63,7 +68,44 @@ launch_fixture() {
     done
     return 1
 }
+pace_states() {
+    launch_fixture --scenario pace-states --appearance "$look" --popover --summary-slots tightest nextReset
+    "$qa" ax tree --window popover > "$out/pace-states-popover-$look.ax.txt"
+    shot pace-states-popover popover
+    launch_fixture --scenario pace-states --appearance "$look" --status-item
+    "$qa" ax tree --window status > "$out/pace-states-status-$look.ax.txt"
+    shot pace-states-status status
+    launch_fixture --scenario pace-states --appearance "$look" --increase-contrast --popover --summary-slots tightest nextReset
+    shot pace-states-ic-popover popover
+    launch_fixture --scenario pace-states --appearance "$look" --increase-contrast --status-item
+    shot pace-states-ic-status status
+    launch_fixture --scenario pace-states --appearance "$look" --pace-status-comparison
+    shot pace-states-status-red popover
+    for pane in general menuBar appearance; do
+        launch_fixture --scenario pace-states --appearance "$look" --pane "$pane"
+        "$qa" ax select-pane "$pane" --window settings
+        sleep 0.3
+        shot "pace-states-$pane" settings
+        if [[ "$pane" == menuBar || "$pane" == appearance ]]; then
+            bottom settings.scroll "pace-states-$pane" settings
+        fi
+    done
+
+    # Match the names and fixture settings in the approved baseline for changed surfaces.
+    launch_fixture --scenario single-account --appearance "$look" --popover
+    shot single-account popover
+    for pane in general menuBar appearance; do
+        launch_fixture --scenario multi-20 --appearance "$look" --pane "$pane"
+        "$qa" ax select-pane "$pane" --window settings
+        sleep 0.3
+        shot "$pane-top" settings
+    done
+}
 for look in light dark; do
+    if [[ "$mode" == --pace-states ]]; then
+        pace_states
+        continue
+    fi
     for layout in columns scroll; do
         launch_fixture --scenario multi-20 --appearance "$look" --popover --long-lists "$layout"
         if [[ "$look-$layout" == light-columns ]]; then

@@ -39,6 +39,23 @@ public enum Countdown {
         return "<1m"
     }
 
+    /// Expand a compact countdown for VoiceOver.
+    public static func spokenReset(_ countdown: String) -> String {
+        switch countdown {
+        case "resets now", "Available": return countdown.lowercased()
+        case "<1m": return "resets in less than a minute"
+        default:
+            let units: [Character: String] = ["d": "day", "h": "hour", "m": "minute"]
+            let parts = countdown.split(separator: " ").compactMap { part -> String? in
+                guard let suffix = part.last, let unit = units[suffix],
+                      let count = Int(part.dropLast()) else { return nil }
+                return "\(count) \(unit)\(count == 1 ? "" : "s")"
+            }
+            guard !parts.isEmpty else { return countdown }
+            return "resets in \(parts.joined(separator: " and "))"
+        }
+    }
+
     /// The coarsest single-unit countdown — "22h 54m" → "22h", "1d 23h" → "1d". A tight Micro
     /// row shows this so the label, meter, and percentage stay on one line; the full precision
     /// remains in the tooltip.

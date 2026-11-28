@@ -137,8 +137,34 @@ struct DemoFixtureTests {
         #expect(meters.map(\.summary.providerID) == [.claude, .claude, .codex, .codex, .antigravity, .antigravity])
         #expect(meters.map(\.badge) == ["PRO", "WORK", "200", "200", "G1", "G2"])
         #expect(meters.map(\.summary.text) == ["100%", "20%", "75%", "30%", "100%", "40%"])
-        #expect(meters.map { $0.pace?.tier } == [.onPace, .wayAhead, .onPace, .ahead, .onPace, .ahead])
+        #expect(meters.map { $0.pace?.tier } == [.farOffPace(.slow), .farOffPace(.fast), .farOffPace(.slow), .offPace(.fast), .farOffPace(.slow), .offPace(.fast)])
         #expect(meters.allSatisfy { $0.pace?.expectedRemaining != nil })
+    }
+
+    @MainActor @Test func paceStatesDemoPinsFiveMetersAcrossThreeWindowLengths() async {
+        let fixture = DemoFixture.multiFixture(for: .paceStates)
+        let defaults = DemoMemoryDefaults()
+        let preferences = Preferences(defaults: defaults)
+        let registry = AccountRegistry(defaults: defaults)
+        registry.seed(fixture.accounts)
+        DemoFixture.applyPaceStatesPreferences(to: preferences)
+        let store = UsageStore(providers: fixture.providers, preferences: preferences, accounts: fixture.accounts,
+                               accountRegistry: registry, now: { DemoFixture.paceStatesDate })
+        await store.refreshAll()
+
+        let meters = store.menuBarMeters
+        #expect(meters.map { $0.pace?.tier } == [
+            .onPace, .offPace(.fast), .offPace(.slow), .farOffPace(.fast), .farOffPace(.slow),
+        ])
+        #expect(meters.map { $0.pace?.expectedRemaining } == Array(repeating: 0.5, count: 5))
+        #expect(meters.map(\.summary.text) == ["50%", "41%", "59%", "22%", "80%"])
+        #expect(meters.map(\.badge) == ["ON", "F1", "S1", "F2", "S2"])
+        let windows = fixture.accounts.flatMap { store.snapshot(for: $0.key).windows }
+        let expectedKinds: Set<WindowKind> = [
+            .weekly, .fiveHour, .billingPeriod(label: "Monthly", duration: 30 * 86_400),
+        ]
+        #expect(Set(windows.map(\.kind)) == expectedKinds)
+        #expect(windows.allSatisfy { MenuBarPace(window: $0, now: DemoFixture.paceStatesDate)?.expectedRemaining == 0.5 })
     }
 
     @MainActor @Test func menuBarAccountLabelsFollowExplicitBadges() async {

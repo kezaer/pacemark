@@ -6,35 +6,81 @@ struct MenuBarPaceTests {
     private let now = Date(timeIntervalSinceReferenceDate: 0)
     private let duration: TimeInterval = 18_000
 
-    @Test func projectedBurnRateDefinesPace() {
-        let reset = now.addingTimeInterval(duration * 0.75)
-        let cases: [(Double, MenuBarPace.Tier)] = [
-            (0.25, .onPace), (0.30, .ahead), (0.325, .ahead),
-            (0.33, .wayAhead), (0.50, .wayAhead)
+    @Test func displayedDeviationBandsAreSymmetricAndInclusive() {
+        let cases: [(Int, UsageSeverity)] = [
+            (49, .healthy), (50, .healthy), (51, .low),
+            (149, .low), (150, .low), (151, .critical)
         ]
-        for (used, tier) in cases {
-            let pace = MenuBarPace(usedFraction: used, duration: duration, reset: reset, now: now)
-            #expect(pace?.tier == tier)
-            #expect(pace?.expectedRemaining == 0.75)
+        for (direction, sign) in [(MenuBarPace.Direction.fast, -1), (.slow, 1)] {
+            for (magnitude, severity) in cases {
+                let delta = magnitude * sign
+                let pace = makePace(used: 50 - Double(delta) / 10, elapsed: 0.5)
+                #expect(pace?.deviationTenths == delta)
+                #expect(pace?.direction == direction)
+                #expect(pace?.tier?.severity == severity)
+                #expect(pace?.tier?.direction == (severity == .healthy ? nil : direction))
+                #expect(pace?.isOffPace == (severity != .healthy))
+            }
         }
-
-        let resetAtFiftyFivePercentRemaining = now.addingTimeInterval(9_900)
-        let onTrack = MenuBarPace(usedFraction: 0.45, duration: duration,
-                                reset: resetAtFiftyFivePercentRemaining, now: now)
-        #expect(onTrack?.tier == .onPace)
     }
 
-    @Test func earlyWindowUsesDeltaBeforeTenPercentElapsed() {
-        let earlyReset = now.addingTimeInterval(duration * 0.95)
-        let cases: [(Double, MenuBarPace.Tier)] = [
-            (0.10, .onPace), (0.21, .ahead), (0.41, .wayAhead)
-        ]
-        for (used, tier) in cases {
-            let pace = MenuBarPace(usedFraction: used, duration: duration, reset: earlyReset, now: now)
-            #expect(pace?.tier == tier)
+    @Test func paceAppliesFromTheStartAndExhaustionUsesTheSameBands() {
+        for (used, elapsed, tier) in [
+            (0.0, 0.0, MenuBarPace.Tier.onPace), (5, 0, .onPace),
+            (5.1, 0, .offPace(.fast)), (15.1, 0, .farOffPace(.fast)),
+            (0, 0.09, .offPace(.slow)), (100, 0, .farOffPace(.fast)),
+            (100, 0.5, .farOffPace(.fast)), (100, 0.9, .offPace(.fast)),
+            (100, 0.97, .onPace), (100, 1, .onPace),
+            (92, 0.99, .offPace(.slow)), (80, 0.99, .farOffPace(.slow))
+        ] {
+            #expect(makePace(used: used, elapsed: elapsed)?.tier == tier)
         }
-        let tenthReset = now.addingTimeInterval(duration * 0.90)
-        #expect(MenuBarPace(usedFraction: 0.15, duration: duration, reset: tenthReset, now: now)?.tier == .wayAhead)
+    }
+
+    @Test func decimalTiesUseTheOriginalUtilizationBeforeSubtracting() {
+        // 84.95% used displays as 15.1% left, exactly five points below 20.1%.
+        let fast = makePace(used: 84.95, elapsed: 0.799)
+        #expect(fast?.deviationTenths == -50)
+        #expect(fast?.tier == .onPace)
+        // 34.95% used displays as 65.1% left, just beyond the 15-point band.
+        let slow = makePace(used: 34.95, elapsed: 0.5)
+        #expect(slow?.deviationTenths == 151)
+        #expect(slow?.tier == .farOffPace(.slow))
+    }
+
+    @Test func expectedBalanceRoundsBeforeTheDeviationIsClassified() {
+        let kind = WindowKind.billingPeriod(label: "Fixture", duration: 20_000)
+        let window = UsageWindow(kind: kind, utilization: 85,
+                                 resetsAt: now.addingTimeInterval(4_010))
+        let pace = MenuBarPace(window: window, now: now)
+        // The pace line is 20.05% left, displayed as 20.1%. Against 15.0% left this is yellow.
+        #expect(pace?.deviationTenths == -51)
+        #expect(pace?.tier == .offPace(.fast))
+    }
+
+    @Test func scalesTimeBeforeDivisionAtTheFivePointBoundary() {
+        let reset = now.addingTimeInterval(1_899)
+        let fast = MenuBarPace(window: UsageWindow(kind: .fiveHour, utilization: 94.5, resetsAt: reset), now: now)
+        #expect(fast?.expectedRemaining == 1_899.0 / duration)
+        #expect(fast?.deviationTenths == -51)
+        #expect(fast?.tier == .offPace(.fast))
+
+        let calm = MenuBarPace(window: UsageWindow(kind: .fiveHour, utilization: 84.4, resetsAt: reset), now: now)
+        #expect(calm?.deviationTenths == 50)
+        #expect(calm?.tier == .onPace)
+    }
+
+    @Test func fractionInitializerPreservesUtilizationDecimalTies() {
+        let pace = MenuBarPace(usedFraction: 0.0505, duration: duration,
+                               reset: now.addingTimeInterval(duration), now: now)
+        #expect(pace?.remaining == 1 - 0.0505)
+        #expect(pace?.deviationTenths == -50)
+        #expect(pace?.tier == .onPace)
+    }
+
+    private func makePace(used: Double, elapsed: Double) -> MenuBarPace? {
+        MenuBarPace(window: UsageWindow(kind: .fiveHour, utilization: used,
+                                       resetsAt: now.addingTimeInterval(duration * (1 - elapsed))), now: now)
     }
 
     @Test func fillAndTickShareTheOpenClockwiseArc() throws {
@@ -96,9 +142,13 @@ struct MenuBarPaceTests {
         #expect(MenuBarPace(window: window, now: now)?.tier == .onPace)
     }
 
-    @Test func exhaustedBalanceIsAlwaysRed() {
-        #expect(MenuBarPace(usedFraction: 1, duration: duration, reset: now, now: now)?.tier == .wayAhead)
-        #expect(MenuBarPace(usedFraction: 1, duration: nil, reset: nil, now: now)?.tier == .wayAhead)
+    @Test func exhaustedBalanceWithoutPaceEvidenceUsesTheFixedBand() {
+        let window = UsageWindow(kind: .weekly, utilization: 100, resetSchedule: .unresolved(.absent))
+        let pace = MenuBarPace(window: window, now: now)
+        #expect(pace?.tier == nil)
+        #expect(pace?.deviationTenths == nil)
+        #expect(pace?.direction == nil)
+        #expect(UsageMeterReading(window: window).severity == .critical)
     }
 
     @Test func elapsedIsClampedAtBothEnds() {
@@ -117,7 +167,7 @@ struct MenuBarPaceTests {
             let window = UsageWindow(kind: .other(label), utilization: 60, resetsAt: now.addingTimeInterval(duration / 2))
             let pace = MenuBarPace(window: window, now: now)
             #expect(pace?.expectedRemaining == 0.5)
-            #expect(pace?.tier == .ahead)
+            #expect(pace?.tier == .offPace(.fast))
             #expect(pace?.expectedRemaining == 0.5)
         }
     }
@@ -131,7 +181,7 @@ struct MenuBarPaceTests {
             let window = UsageWindow(kind: kind, utilization: reading.percentUsed, resetsAt: reset)
             let pace = try #require(MenuBarPace(window: window, now: now))
             #expect(pace.expectedRemaining == 0.5)
-            #expect(pace.tier == .ahead)
+            #expect(pace.tier == .offPace(.fast))
             #expect(pace.expectedRemaining == 0.5)
         }
     }
@@ -145,7 +195,7 @@ struct MenuBarPaceTests {
         let windows = CodexWindowMapping.windows(buckets)
         #expect(windows.map(\.kind) == [.other("Codex Spark Weekly"), .other("Codex Spark 5h")])
         #expect(windows.map { MenuBarPace(window: $0, now: now)?.expectedRemaining } == [0.5, 0.5])
-        #expect(windows.map { MenuBarPace(window: $0, now: now)?.tier } == [.ahead, .wayAhead])
+        #expect(windows.map { MenuBarPace(window: $0, now: now)?.tier } == [.offPace(.fast), .farOffPace(.fast)])
     }
 
     @Test func usesTheShownWindowKindAndDeclaredBillingDuration() {
@@ -156,7 +206,7 @@ struct MenuBarPaceTests {
             let window = UsageWindow(kind: kind, utilization: 65, resetsAt: now.addingTimeInterval(duration / 2))
             let pace = MenuBarPace(window: window, now: now)
             #expect(pace?.expectedRemaining == 0.5)
-            #expect(pace?.tier == .ahead)
+            #expect(pace?.tier == .offPace(.fast))
         }
         let unknown = UsageWindow(kind: .other("Pool"), utilization: 65, resetsAt: now)
         #expect(MenuBarPace(window: unknown, now: now)?.tier == nil)

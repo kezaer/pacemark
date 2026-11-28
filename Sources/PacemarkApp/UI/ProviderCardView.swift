@@ -1553,7 +1553,7 @@ struct CardRowAction<Accessory: View>: View {
     /// full label ink and semibold against the secondary rest. Critical rows keep the red on
     /// the verb and the glyph rather than on the whole sentence.
     private var criticalInk: Color? {
-        severity == .critical ? ProviderStyle.criticalText(scheme: scheme) : nil
+        severity == .critical ? ProviderStyle.statusCriticalText(scheme: scheme) : nil
     }
 
     private var actionInk: Color {

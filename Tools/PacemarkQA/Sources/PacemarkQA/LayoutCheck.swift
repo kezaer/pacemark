@@ -34,7 +34,7 @@ private func fixturePID(_ root: AXUIElement) throws -> pid_t {
     return pid
 }
 
-func checkLayout(_ root: AXUIElement) throws {
+func checkLayout(_ root: AXUIElement, statusItem: Bool) throws {
     var violations: [String] = []
     let windowActive = NSRunningApplication(processIdentifier: try fixturePID(root))?.isActive == true
     if windowActive {
@@ -139,11 +139,25 @@ func checkLayout(_ root: AXUIElement) throws {
             }
         }
     }
-    walk(root) { node, _ in
-        let id = string(node, kAXIdentifierAttribute)
-        if (id == "pds.card" || id.hasPrefix("popover.card.")), let card = element(node) { inspect(node, card) }
+    if statusItem {
+        var images: [Element] = []
+        walk(root) { node, _ in
+            if let image = element(node), image.role == kAXImageRole { images.append(image) }
+        }
+        if images.count != 1 { violations.append("Expected one accessible status item image") }
+        for image in images {
+            if image.title.isEmpty { violations.append("Status item has no accessible reading") }
+            if element(root)?.frame.contains(image.frame) != true {
+                violations.append("Status item artwork extends outside its panel")
+            }
+        }
+    } else {
+        walk(root) { node, _ in
+            let id = string(node, kAXIdentifierAttribute)
+            if (id == "pds.card" || id.hasPrefix("popover.card.")), let card = element(node) { inspect(node, card) }
+        }
+        if cards == 0 { violations.append("No measurable cards") }
     }
-    if cards == 0 { violations.append("No measurable cards") }
     var geometry: [[String: Any]] = []
     if let window = element(root)?.frame {
         func record(_ node: AXUIElement, parent: Int, enabled: Bool) {

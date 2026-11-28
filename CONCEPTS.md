@@ -7,6 +7,6 @@
 | Meter | The usage display for a selected account and window in the menu bar. |
 | Runs out first | Automatic window selection for a meter. Pacemark chooses the most constrained eligible window. |
 | Count | The display choice between **What's used** and **What's left**. Both use the same provider reading. |
-| Pace | Usage relative to elapsed time in a window. Half the allowance spent a quarter of the way to reset is ahead of pace. |
+| Pace | Remaining quota compared with what would be left at an even rate. Staying within 5 percentage points is on pace. A difference of more than 5 and up to 15 is yellow, and more than 15 is red. Using quota too fast or too slowly uses the same bands. |
 | Summary tiles | The summaries selected for the top of the popover. |
 | Warm-up | An opt-in message that spends subscription quota to start an eligible idle window. See [warm-up rules](docs/dev/warm-up.md). |

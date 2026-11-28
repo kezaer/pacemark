@@ -68,8 +68,8 @@ struct MenuBarMeterControls: DynamicProperty {
     private static let iconSizeKey = "t3.menuBar.iconSize"
     private static let textSizeKey = "t3.menuBar.textSize"
 
-    static func seedMenuBarDemo(defaults: UserDefaults) {
-        defaults.set(false, forKey: showNumberKey)
+    static func seedMenuBarDemo(defaults: UserDefaults, showNumber: Bool = false) {
+        defaults.set(showNumber, forKey: showNumberKey)
         defaults.set(MenuBarMeterTuning.LabelWeight.regular.rawValue, forKey: labelWeightKey)
         defaults.set(1.0, forKey: ringLineWidthKey)
         defaults.set(MenuBarMeterTuning.defaults.markScale, forKey: markScaleKey)

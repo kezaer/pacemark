@@ -249,8 +249,11 @@ struct MenuBarMeterTable: View {
         let cell = reading.selected
         let percentage = cell?.value.displayedPercentage
         let tier = cell?.pace?.tier
-        let ink = tier == .ahead || tier == .wayAhead ? LedgerInk.pace(tier, scheme: scheme)
-            : cell?.pace == nil ? PDS.Ink.inkTertiary : .primary
+        let fallback = cell.flatMap { UsageMeterReading(window: $0.value.window).severity }
+        let isLive = !reading.ledger.isDimmed && cell?.value.window.freshness.isLive == true
+        let ink = isLive ? LedgerInk.usage(tier, fallback: fallback, scheme: scheme) : PDS.Ink.inkTertiary
+        let tooltip = [tier?.label, cell?.countdown.map(Countdown.spokenReset)]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         return HStack(spacing: PDS.Space.m) {
             Text(percentage.map { "\($0)%" } ?? "—")
                 .font(PopoverLedgerType.value).fixedSize()
@@ -263,7 +266,7 @@ struct MenuBarMeterTable: View {
                 .lineLimit(1)
                 .frame(width: LedgerMetrics.resetWidth, alignment: .trailing)
         }
-        .help(cell?.countdown ?? "No reset countdown")
+        .help(tooltip.isEmpty ? "No reset countdown" : tooltip.prefix(1).uppercased() + tooltip.dropFirst())
     }
 
     @ViewBuilder

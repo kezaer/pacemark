@@ -14,14 +14,14 @@ struct MenuBarPreviewStrip: View {
 
     var body: some View {
         let isDark = darkBarOverride ?? previewAppearance.map { $0 == .dark } ?? MenuBarAppearanceMonitor.shared.isDarkMenuBar
-        let palette = MenuBarPalette(isDarkMenuBar: isDark)
+        let palette = MenuBarPalette(isDarkMenuBar: isDark, increasedContrast: contrast == .increased)
         let renderer = MenuBarGaugeRenderer(palette: palette, tuning: tuning)
         let strip = renderer.image(meters: meters, highlighting: highlightedAccount)
         let mayHide = strip.size.width > 180
         SettingsLedgerTile(title: "Preview") {
             Text("\(meters.count) \(meters.count == 1 ? "meter" : "meters") · \(Double(strip.size.width).formatted(.number.grouping(.never).precision(.fractionLength(0)))) pt\(mayHide ? " · May hide behind the notch" : "")")
             .font(PopoverLedgerType.sentence.monospacedDigit())
-            .foregroundStyle(mayHide ? LedgerInk.pace(.ahead, scheme: previewAppearance ?? scheme) : .secondary)
+            .foregroundStyle(mayHide ? PDS.Ink.paceWarning(previewAppearance ?? scheme) : .secondary)
             .lineLimit(1)
         } content: {
             ViewThatFits(in: .horizontal) {
@@ -92,4 +92,5 @@ struct MenuBarPreviewStrip: View {
     }
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
 }

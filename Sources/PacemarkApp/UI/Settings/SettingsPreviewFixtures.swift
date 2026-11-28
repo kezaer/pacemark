@@ -9,10 +9,10 @@ struct SettingsPreviewFixtures {
     init(now: Date = DemoFixture.now) {
         self.now = now
         entries = [
-            Self.entry(.claude, name: "Personal", plan: "Max", weeklyUsed: 38, sessionUsed: 26, offset: 3600, now: now),
-            Self.entry(.claude, name: "Work", plan: "Pro", weeklyUsed: 60, sessionUsed: 82, offset: 0, now: now),
-            Self.entry(.codex, name: "Pro 200", plan: "Pro", weeklyUsed: 25, sessionUsed: 47, offset: 7200, now: now),
-            Self.entry(.codex, name: "100", plan: "Pro Lite", weeklyUsed: 4, sessionUsed: 9, offset: 10800, now: now),
+            Self.entry(.claude, name: "Personal", plan: "Max", weeklyUsed: 50, sessionUsed: 50, offset: 3600, now: now),
+            Self.entry(.claude, name: "Work", plan: "Pro", weeklyUsed: 60, sessionUsed: 75, offset: 0, now: now),
+            Self.entry(.codex, name: "Pro 200", plan: "Pro", weeklyUsed: 40, sessionUsed: 50, offset: 7200, now: now),
+            Self.entry(.codex, name: "100", plan: "Pro Lite", weeklyUsed: 75, sessionUsed: 50, offset: 10800, now: now),
         ]
     }
 
@@ -36,8 +36,8 @@ struct SettingsPreviewFixtures {
     ) -> ProviderAccountEntry {
         let account = ProviderAccount(id: AccountID("settings-preview-\(name.lowercased().replacingOccurrences(of: " ", with: "-"))"), providerID: provider, label: name, isBuiltIn: false)
         let windows = [
-            UsageWindow(kind: .fiveHour, utilization: sessionUsed, resetsAt: now.addingTimeInterval(6720 + offset)),
-            UsageWindow(kind: .weekly, utilization: weeklyUsed, resetsAt: now.addingTimeInterval(345600 + offset)),
+            UsageWindow(kind: .fiveHour, utilization: sessionUsed, resetsAt: now.addingTimeInterval(9000 + offset / 24)),
+            UsageWindow(kind: .weekly, utilization: weeklyUsed, resetsAt: now.addingTimeInterval(302400 + offset)),
         ]
         return ProviderAccountEntry(account: account, snapshot: UsageSnapshot(
             providerID: provider, windows: windows, planLabel: plan, capturedAt: now, freshness: .live

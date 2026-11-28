@@ -80,7 +80,16 @@ enum MenuBarRenderHarness {
     static func run(outputDirectory: String) throws {
         let dir = URL(fileURLWithPath: outputDirectory, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let store = fixtureStore(preferences: Preferences(defaults: DemoMemoryDefaults()))
+        let arguments = CommandLine.arguments
+        let paceStates = DemoFixture.scenarioRequest(arguments: arguments) == .multiAccount(.paceStates)
+            || arguments.firstIndex(of: "--render-scenario").map {
+                arguments.dropFirst($0 + 1).first == DemoFixture.MultiAccountScenario.paceStates.rawValue
+            } == true
+        let defaults = DemoMemoryDefaults()
+        let store = paceStates ? AppComposition.demoMultiAccountStore(scenario: .paceStates, defaults: defaults)
+            : fixtureStore(preferences: Preferences(defaults: defaults))
+        var tuning = MenuBarMeterTuning.defaults
+        if paceStates { tuning.showNumber = true }
         // Running the NSApp loop lets the mocked providers publish before writing the PNGs.
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
@@ -89,7 +98,7 @@ enum MenuBarRenderHarness {
             do {
                 for dark in [false, true] {
                     let palette = MenuBarPalette(isDarkMenuBar: dark)
-                    let renderer = MenuBarGaugeRenderer(palette: palette, tuning: .defaults)
+                    let renderer = MenuBarGaugeRenderer(palette: palette, tuning: tuning)
                     let image = renderer.image(meters: store.menuBarMeters)
                     let url = dir.appendingPathComponent("menu-bar-strip-\(dark ? "dark" : "light").png")
                     try writeStrip(image, dark: dark, to: url)

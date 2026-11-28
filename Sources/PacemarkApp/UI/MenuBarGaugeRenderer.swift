@@ -49,10 +49,13 @@ struct MenuBarGaugeRenderer {
                 let cell = gauge(meter, layout: layout)
                 guard let key, key == meter.sourceAccountKey else { return cell }
                 return Piece(width: cell.width) { x in
-                    ink.withAlphaComponent(0.15).setFill()
-                    NSBezierPath(roundedRect: NSRect(x: x - 2, y: 0, width: cell.width + 4, height: height),
-                                 xRadius: 5, yRadius: 5).fill()
                     cell.draw(x)
+                    // Outline only. An underlay lightens the dark plate beneath the red arc.
+                    ink.withAlphaComponent(0.30).setStroke()
+                    let outline = NSBezierPath(roundedRect: NSRect(x: x - 2, y: 0.5, width: cell.width + 4, height: height - 1),
+                                               xRadius: 5, yRadius: 5)
+                    outline.lineWidth = 1
+                    outline.stroke()
                 }
             }, gap: Self.meterGap)
         }
@@ -73,12 +76,15 @@ struct MenuBarGaugeRenderer {
         let fill = min(1, max(0, meter.fill ?? 0))
         let number = tuning.showNumber && !meter.summary.isNeutral ? meter.summary.text : nil
         let dotted = meter.awaitingFirstReading || meter.summary.needsAttention
-        return gaugeArtwork(meter, layout: layout, kind: kind, fill: fill, color: color, number: number, dotted: dotted)
+        let isCritical = meter.isLiveReading && !dotted && severity == .critical
+        let numeralInk = isCritical ? palette.severityInk(for: severity).menuBarColor : ink
+        return gaugeArtwork(meter, layout: layout, kind: kind, fill: fill, color: color,
+                            number: number, numeralInk: numeralInk, dotted: dotted)
     }
 
     private func gaugeArtwork(
         _ meter: MenuBarMeter, layout: UniformRingLayout, kind: MenuBarGlyphKind,
-        fill: Double, color: NSColor, number: String?, dotted: Bool
+        fill: Double, color: NSColor, number: String?, numeralInk: NSColor, dotted: Bool
     ) -> Piece {
         let geometry = layout.geometry
         let innerDiameter = 2 * geometry.innerRadius
@@ -100,7 +106,7 @@ struct MenuBarGaugeRenderer {
             label
         ]))
         let artwork = overlay([gauge, drawMark(kind, size: logo, color: ink.withAlphaComponent(meter.isLiveReading && !dotted ? 1 : 0.55), y: geometry.center)])
-        let numeral = text(number, size: geometry.besideFontSize, color: ink, y: geometry.center, leading: true)
+        let numeral = text(number, size: geometry.besideFontSize, color: numeralInk, y: geometry.center, leading: true)
         guard numeral.width > 0 else { return artwork }
         let numberX = (artwork.width + geometry.artworkWidth) / 2 + 3
         return Piece(width: max(artwork.width, numberX + numeral.width)) { x in

@@ -57,11 +57,11 @@ struct LedgerRecipeTests {
         #expect(recipe.message == nil)
         #expect(recipe.primary?.value.window.kind == .weekly)
         #expect(recipe.primary?.column == "Week")
-        #expect(recipe.primary?.pace?.tier == .onPace)
+        #expect(recipe.primary?.pace?.tier == .farOffPace(.slow))
         #expect(recipe.windows.map(\.value.window.kind) == [.fiveHour, .weekly, model.kind, month.kind])
         #expect(recipe.windows.map(\.detailLabel) == ["5h", "Weekly", "Fable", "Monthly"])
         #expect(recipe.windows.first { $0.detailLabel == "Fable" }?.pace?.expectedRemaining == 0.5)
-        #expect(recipe.windows.first { $0.detailLabel == "Fable" }?.pace?.tier == .ahead)
+        #expect(recipe.windows.first { $0.detailLabel == "Fable" }?.pace?.tier == .offPace(.fast))
         #expect(row([short, model]).primary?.value.window.kind == .fiveHour)
         #expect(recipe.canExpand)
         let unavailable = window(.weekly, used: 65, resetsIn: 9_000, freshness: .unavailable(since: now))
@@ -124,6 +124,43 @@ struct LedgerRecipeTests {
         let replay = row([window(.weekly, used: 60, resetsIn: 302_400)], providerID: .antigravity)
         #expect(replay.windows.map(\.column) == ["Week"])
         #expect(replay.windows.first?.pace?.expectedRemaining == 0.5)
+    }
+
+    @Test func antigravityPoolRankingUsesBandDirectionAndAbsoluteDeviation() {
+        let gemini = WindowKind.other("Gemini weekly")
+        let other = WindowKind.other("Other weekly")
+        let halfWeek: TimeInterval = 302_400
+        let yellowSlow = window(gemini, used: 40, resetsIn: halfWeek)
+        let redSlow = window(other, used: 15, resetsIn: halfWeek)
+        #expect(row([yellowSlow, redSlow], providerID: .antigravity).primary?.value.window == redSlow)
+
+        let lessRedSlow = window(gemini, used: 30, resetsIn: halfWeek)
+        #expect(row([lessRedSlow, redSlow], providerID: .antigravity).primary?.value.window == redSlow)
+
+        let redFast = window(gemini, used: 66, resetsIn: halfWeek)
+        #expect(row([redFast, redSlow], providerID: .antigravity).primary?.value.window == redFast)
+
+        let yellowFast = window(gemini, used: 60, resetsIn: halfWeek)
+        #expect(row([yellowFast, redSlow], providerID: .antigravity).primary?.value.window == redSlow)
+        let staleRed = redSlow.withFreshness(.stale(observedAt: now))
+        #expect(row([yellowFast, staleRed], providerID: .antigravity).primary?.value.window == yellowFast)
+
+        let sameReading = window(gemini, used: 15, resetsIn: halfWeek)
+        #expect(row([redSlow, sameReading], providerID: .antigravity).primary?.value.window == sameReading)
+    }
+
+    @Test func redSlowNeverOutranksProjectedDepletionInTightestSummary() throws {
+        let slowKey = ProviderAccount.builtIn(for: .claude).key
+        let fastKey = ProviderAccount.builtIn(for: .codex).key
+        let slow = window(used: 15, resetsIn: 9_000)
+        let fast = window(used: 60, resetsIn: 9_000)
+        #expect(row([slow]).primary?.pace?.tier == .farOffPace(.slow))
+        let tightest = try #require(PopoverSummaryRecipe.tightest(candidates: [
+            .init(key: slowKey, title: "Slow", window: slow),
+            .init(key: fastKey, title: "Fast", window: fast)
+        ], now: now))
+        #expect(tightest.candidate.key == fastKey)
+        #expect(tightest.projection != nil)
     }
 
     @Test func nextResetIncludesTheTightestWindowWhenItResetsFirst() throws {

@@ -64,9 +64,10 @@ struct MenuBarMeterGlyph: View {
     static let defaultSize: CGFloat = 21
     var size: CGFloat = Self.defaultSize
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        let renderer = MenuBarGaugeRenderer(palette: MenuBarPalette(isDarkMenuBar: scheme == .dark), tuning: glyphTuning,
+        let renderer = MenuBarGaugeRenderer(palette: MenuBarPalette(isDarkMenuBar: scheme == .dark, increasedContrast: contrast == .increased), tuning: glyphTuning,
                                            heightLimit: 26)
         let ring = MenuBarRingLayout(requestedDiameter: size - PDS.Space.xs, heightLimit: size,
                                      ringWidth: tuning.ringLineWidth, showsTick: tuning.showPaceTick,
@@ -140,6 +141,7 @@ struct MenuBarMeterLegend: View {
     let date: Date
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.colorSchemeContrast) private var contrast
     private let legend = [
         "Arc: how much quota is left, colored by your pace.",
         "Tick: where you’d be if you used it evenly until the reset.",
@@ -156,9 +158,9 @@ struct MenuBarMeterLegend: View {
         var style = tuning
         style.showNumber = false
         style.showPaceTick = true
-        let renderer = MenuBarGaugeRenderer(palette: .init(isDarkMenuBar: scheme == .dark), tuning: style)
-        let pace = MenuBarPace(usedFraction: 0.25, duration: 100, reset: date.addingTimeInterval(55), now: date)
-        let meter = MenuBarMeter(summary: .init(text: "75%", providerID: .claude, detail: nil, isNeutral: false),
+        let renderer = MenuBarGaugeRenderer(palette: .init(isDarkMenuBar: scheme == .dark, increasedContrast: contrast == .increased), tuning: style)
+        let pace = MenuBarPace(usedFraction: 0.45, duration: 100, reset: date.addingTimeInterval(55), now: date)
+        let meter = MenuBarMeter(summary: .init(text: "55%", providerID: .claude, detail: nil, isNeutral: false),
                                  fill: pace?.remaining, isLiveReading: true, pace: pace)
         let layout = MeterLegendLayout(renderer: renderer, meter: meter)
         return ZStack(alignment: .topLeading) {
@@ -203,15 +205,48 @@ struct MenuBarMeterLegend: View {
                     }
                 }
             }
-            HStack(alignment: .top, spacing: LedgerMetrics.rowGap) {
-                sample("On pace", "Lasts until the reset at this rate.", used: 0.25)
-                sample("Ahead of pace", "Runs out before the reset.", used: 0.59)
-                sample("Way ahead", "Runs out well before the reset.", used: 0.80)
-                sample("Last reading", "Prior reading.", used: 0.35, live: false)
-                sample("Waiting", "No reading yet.", used: nil, live: false)
+            VStack(spacing: PDS.Space.s) {
+                paceStates
+                HStack(alignment: .top, spacing: LedgerMetrics.rowGap) {
+                    sample("Last reading", "Prior reading.", used: 0.35, live: false)
+                    sample("Waiting", "No reading yet.", used: nil, live: false)
+                }
             }
             .padding(.bottom, PDS.Space.xs)
         }
+    }
+
+    private var paceStates: some View {
+        let samples: [(tier: MenuBarPace.Tier, meaning: String, used: Double)] = [
+            (.onPace, "Within 5 points of even use.", 0.50),
+            (.offPace(.fast), "5–15 points faster than even use.", 0.60),
+            (.offPace(.slow), "5–15 points slower than even use.", 0.40),
+            (.farOffPace(.fast), "Over 15 points faster than even use.", 0.75),
+            (.farOffPace(.slow), "Over 15 points slower than even use.", 0.25),
+        ]
+        return Grid(horizontalSpacing: LedgerMetrics.rowGap, verticalSpacing: PDS.Space.xs) {
+            GridRow {
+                ForEach(samples.indices, id: \.self) { index in
+                    glyph(used: samples[index].used, live: true, size: 36)
+                        .padding(.vertical, PDS.Space.xs)
+                }
+            }
+            GridRow(alignment: .firstTextBaseline) {
+                ForEach(samples.indices, id: \.self) { index in
+                    Text(samples[index].tier.label)
+                        .font(SettingsType.help.bold())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+            GridRow(alignment: .firstTextBaseline) {
+                ForEach(samples.indices, id: \.self) { index in
+                    PDSHelpText(samples[index].meaning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .multilineTextAlignment(.center)
     }
 
     private func sample(_ label: String, _ meaning: String, used: Double?, live: Bool = true) -> some View {
@@ -219,7 +254,7 @@ struct MenuBarMeterLegend: View {
             glyph(used: used, live: live, size: 36)
                 .padding(.vertical, PDS.Space.xs)
             Text(label).font(SettingsType.help.bold()).fixedSize(horizontal: false, vertical: true)
-            PDSHelpText(meaning).lineLimit(2)
+            PDSHelpText(meaning).fixedSize(horizontal: false, vertical: true)
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)

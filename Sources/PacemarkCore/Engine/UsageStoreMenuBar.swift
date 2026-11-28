@@ -294,7 +294,7 @@ extension UsageStore {
                                     needsAttention: menuBarNeedsAttention(snapshot)),
             fill: number == nil ? nil : reading?.fraction(for: usagePercentageMode), awaitingFirstReading: snapshot.freshness == .pending,
             isLiveReading: snapshot.freshness == .live && cell?.value.window.freshness.isLive == true,
-            sourceAccountKey: key, glyph: .providerMark(key.providerID), badge: badge, pace: cell?.pace
+            sourceAccountKey: key, glyph: .providerMark(key.providerID), badge: badge, pace: cell?.pace, countdown: cell?.countdown
         )
     }
 }
