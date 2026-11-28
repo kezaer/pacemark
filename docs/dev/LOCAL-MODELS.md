@@ -24,7 +24,8 @@ Scripts/qa/ui-pass.sh .build/qa-run-1
 For the five pace states and their Settings previews, run
 `Scripts/qa/ui-pass.sh .build/qa-pace-states --pace-states`. The menu bar capture uses the
 production status artwork in an inactive fixture panel because the virtual display has no system
-menu bar. Headless checks use `--render-popover <dir> --render-scenario pace-states` and
+menu bar. The pace pass also captures both Increase Contrast appearances and a limit-reached
+sentence beside a critical pace meter. Headless checks use `--render-popover <dir> --render-scenario pace-states` and
 `--render-menubar <dir> --render-scenario pace-states`.
 
 Open the resulting `index.html` to inspect the captured windows. To drive a single fixture, use the checkout's controller.

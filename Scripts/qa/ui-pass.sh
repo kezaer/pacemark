@@ -75,6 +75,12 @@ pace_states() {
     launch_fixture --scenario pace-states --appearance "$look" --status-item
     "$qa" ax tree --window status > "$out/pace-states-status-$look.ax.txt"
     shot pace-states-status status
+    launch_fixture --scenario pace-states --appearance "$look" --increase-contrast --popover --summary-slots tightest nextReset
+    shot pace-states-ic-popover popover
+    launch_fixture --scenario pace-states --appearance "$look" --increase-contrast --status-item
+    shot pace-states-ic-status status
+    launch_fixture --scenario pace-states --appearance "$look" --pace-status-comparison
+    shot pace-states-status-red popover
     for pane in general menuBar appearance; do
         launch_fixture --scenario pace-states --appearance "$look" --pane "$pane"
         "$qa" ax select-pane "$pane" --window settings

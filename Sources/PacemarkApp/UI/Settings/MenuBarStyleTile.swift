@@ -206,13 +206,7 @@ struct MenuBarMeterLegend: View {
                 }
             }
             VStack(spacing: PDS.Space.s) {
-                HStack(alignment: .top, spacing: LedgerMetrics.rowGap) {
-                    sample(MenuBarPace.Tier.onPace.label, "Within 5% of even use.", used: 0.50)
-                    sample(MenuBarPace.Tier.offPace(.fast).label, "5–15% faster than even use.", used: 0.60)
-                    sample(MenuBarPace.Tier.offPace(.slow).label, "5–15% slower than even use.", used: 0.40)
-                    sample(MenuBarPace.Tier.farOffPace(.fast).label, "Over 15% faster than even use.", used: 0.75)
-                    sample(MenuBarPace.Tier.farOffPace(.slow).label, "Over 15% slower than even use.", used: 0.25)
-                }
+                paceStates
                 HStack(alignment: .top, spacing: LedgerMetrics.rowGap) {
                     sample("Last reading", "Prior reading.", used: 0.35, live: false)
                     sample("Waiting", "No reading yet.", used: nil, live: false)
@@ -220,6 +214,39 @@ struct MenuBarMeterLegend: View {
             }
             .padding(.bottom, PDS.Space.xs)
         }
+    }
+
+    private var paceStates: some View {
+        let samples: [(tier: MenuBarPace.Tier, meaning: String, used: Double)] = [
+            (.onPace, "Within 5 points of even use.", 0.50),
+            (.offPace(.fast), "5–15 points faster than even use.", 0.60),
+            (.offPace(.slow), "5–15 points slower than even use.", 0.40),
+            (.farOffPace(.fast), "Over 15 points faster than even use.", 0.75),
+            (.farOffPace(.slow), "Over 15 points slower than even use.", 0.25),
+        ]
+        return Grid(horizontalSpacing: LedgerMetrics.rowGap, verticalSpacing: PDS.Space.xs) {
+            GridRow {
+                ForEach(samples.indices, id: \.self) { index in
+                    glyph(used: samples[index].used, live: true, size: 36)
+                        .padding(.vertical, PDS.Space.xs)
+                }
+            }
+            GridRow(alignment: .firstTextBaseline) {
+                ForEach(samples.indices, id: \.self) { index in
+                    Text(samples[index].tier.label)
+                        .font(SettingsType.help.bold())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+            GridRow(alignment: .firstTextBaseline) {
+                ForEach(samples.indices, id: \.self) { index in
+                    PDSHelpText(samples[index].meaning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .multilineTextAlignment(.center)
     }
 
     private func sample(_ label: String, _ meaning: String, used: Double?, live: Bool = true) -> some View {

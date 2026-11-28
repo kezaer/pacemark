@@ -37,6 +37,9 @@ struct BrandColorValuesTests {
 
     @Test func increasedContrastDarkCriticalFillHasAnAcceptedLedgerTrackAndCardException() {
         let fill = PacemarkSeverityColorValues.criticalFill(dark: true, increasedContrast: true)
+        // Live Increase Contrast capture of the neutral Ledger track and card.
+        #expect(abs(contrastRatio(fill, rgb(74, 74, 74)) - 2.2897) < 0.0001)
+        #expect(abs(contrastRatio(fill, rgb(40, 40, 40)) - 3.8090) < 0.0001)
         // Use the same neutral track and card samples as the standard dark fill.
         #expect(abs(contrastRatio(fill, rgb(85, 85, 85)) - 1.9261) < 0.0001)
         #expect(abs(contrastRatio(fill, rgb(53, 53, 53)) - 3.1690) < 0.0001)

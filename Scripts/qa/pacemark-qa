@@ -54,6 +54,8 @@ def launch(arguments, display):
     parser.add_argument('--appearance', choices=['light', 'dark'], default='light')
     parser.add_argument('--pane')
     parser.add_argument('--status-item', action='store_true')
+    parser.add_argument('--increase-contrast', action='store_true')
+    parser.add_argument('--pace-status-comparison', action='store_true')
     parser.add_argument('--gallery', action='store_true')
     parser.add_argument('--popover', action='store_true')
     parser.add_argument('--long-lists', choices=['columns', 'scroll'], default='columns')
@@ -88,6 +90,10 @@ def launch(arguments, display):
         args.append('--qa-bank-tip')
     if options.status_item:
         args.append('--status-item')
+    if options.increase_contrast:
+        args.append('--qa-increase-contrast')
+    if options.pace_status_comparison:
+        args.append('--qa-pace-status-comparison')
     if options.gallery:
         args.append('--gallery')
     if options.popover:

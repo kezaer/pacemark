@@ -7,6 +7,7 @@ import PacemarkCore
 
 struct PopoverSettingsPane: View {
     let store: UsageStore
+    @Environment(\.colorScheme) private var scheme
     @Environment(\.loadingDate) private var pinnedDate
     private let fixture = SettingsPreviewFixtures()
 
@@ -87,6 +88,7 @@ struct PopoverSettingsPane: View {
                               width: 32, mode: mode)
                 Text("\(reading.roundedPercentage(for: mode) ?? 0)%")
                     .font(PopoverLedgerType.value).fixedSize()
+                    .foregroundStyle(LedgerInk.usage(pace.tier, fallback: reading.severity, scheme: scheme))
                 Text(mode == .used ? "Used" : "Left").font(PopoverLedgerType.unit)
             }
         }

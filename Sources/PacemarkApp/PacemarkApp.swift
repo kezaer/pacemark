@@ -1704,6 +1704,41 @@ private enum QALaunch {
         arguments.firstIndex(of: name).flatMap { arguments.dropFirst($0 + 1).first }
     }
 
+    private struct PaceStatusComparison: View {
+        let date: Date
+        @Environment(\.colorScheme) private var scheme
+
+        var body: some View {
+            let kind = WindowKind.fiveHour
+            let window = UsageWindow(kind: kind, utilization: 75, resetsAt: date.addingTimeInterval(9_000))
+            let pace = MenuBarPace(window: window, now: date)
+            let reading = UsageMeterReading(window: window)
+            PDSCard("Pace and status", accessory: { EmptyView() }) {
+                VStack(alignment: .leading, spacing: PDS.Space.m) {
+                    HStack(spacing: PDS.Space.s) {
+                        LedgerPaceBar(remaining: reading.fraction(for: .remaining), pace: pace,
+                                      severity: reading.severity ?? .healthy)
+                        Text("\(reading.roundedPercentage(for: .remaining) ?? 0)%")
+                            .font(PopoverLedgerType.value)
+                            .foregroundStyle(LedgerInk.usage(pace?.tier, fallback: reading.severity, scheme: scheme))
+                        PDSHelpText("Using very fast")
+                    }
+                    if let limit = UsageLimitSentence(snapshot: DemoFixture.opencodeLimitedSnapshot, now: date) {
+                        StatusSentence(text: limit.text, severity: .critical, indented: false)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, PDS.Space.s)
+                // Leave room for StatusSentence's optical leading adjustment.
+                .padding(.horizontal, PDS.Space.xs)
+            }
+            .frame(width: CGFloat(LedgerMetrics.columns.columnWidth))
+            .padding(PDS.Space.s)
+            // Compare the two production inks on a controlled plate in each appearance.
+            .background(scheme == .dark ? Color.black : .white)
+        }
+    }
+
     @MainActor static func run() {
         guard Bundle.main.bundleIdentifier == "org.pacemark.qa.fixture" else { exit(64) }
         if AppComposition.isTestHost(), DemoFixture.isEnabled {
@@ -1742,13 +1777,28 @@ private enum QALaunch {
             store.showMenuBarLabels = pose != "off"
         }
         controller.configure(store: store)
-        let appearance = NSAppearance(named: argument("--appearance") == "dark" ? .darkAqua : .aqua)
+        let dark = argument("--appearance") == "dark"
+        let increasedContrast = CommandLine.arguments.contains("--qa-increase-contrast")
+        let appearanceName: NSAppearance.Name = switch (dark, increasedContrast) {
+        case (true, true): .accessibilityHighContrastDarkAqua
+        case (false, true): .accessibilityHighContrastAqua
+        case (true, false): .darkAqua
+        case (false, false): .aqua
+        }
+        let appearance = NSAppearance(named: appearanceName)
+        if increasedContrast { app.appearance = appearance }
+
         let panel: NSPanel
-        if CommandLine.arguments.contains("--status-item") {
-            let dark = appearance?.name == .darkAqua
+        if CommandLine.arguments.contains("--qa-pace-status-comparison") {
+            let host = NSHostingController(rootView: PaceStatusComparison(date: fixtureDate))
+            panel = CapturePanel(contentViewController: host)
+            panel.styleMask = [.borderless, .nonactivatingPanel]
+            panel.title = "QA Popover"
+        } else if CommandLine.arguments.contains("--status-item") {
             // The virtual display has no system status bar. Model its button inset around the production label.
             let view = MenuBarStatusLabel(store: store, appearanceOverride: dark)
                 .defaultAppStorage(AppComposition.launchDefaults)
+                .transformEnvironment(\._colorSchemeContrast) { if increasedContrast { $0 = .increased } }
                 .padding(.horizontal, MenuBarGaugeRenderer.meterGap / 2)
                 .background {
                     if DemoFixture.scenarioRequest() != .multiAccount(.paceStates) {
@@ -1765,7 +1815,8 @@ private enum QALaunch {
             panel.styleMask = [.borderless, .nonactivatingPanel]
             panel.title = "QA Gallery"
         } else if CommandLine.arguments.contains("--popover") {
-            panel = PopoverTuningModel.pinnedPanel(store: store, fixtureDate: fixtureDate)
+            panel = PopoverTuningModel.pinnedPanel(store: store, fixtureDate: fixtureDate,
+                                                  qaIncreasedContrast: increasedContrast)
             panel.title = "QA Popover"
         } else {
             guard let pane = SettingsPane(rawValue: argument("--pane") ?? "general") else { exit(64) }
@@ -1797,7 +1848,7 @@ private enum QALaunch {
         let backdrop = NSPanel(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel],
                                backing: .buffered, defer: false)
         backdrop.title = "QA Backdrop"
-        backdrop.backgroundColor = appearance?.name == .darkAqua ? NSColor(white: 0.13, alpha: 1)
+        backdrop.backgroundColor = dark ? NSColor(white: 0.13, alpha: 1)
             : NSColor(white: 0.91, alpha: 1)
         backdrop.isOpaque = true
         backdrop.hasShadow = false

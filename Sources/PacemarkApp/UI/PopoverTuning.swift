@@ -209,11 +209,14 @@ final class PopoverTuningModel: ObservableObject {
     static func startAgent() {}
     func showPinnedPopover(store: UsageStore) {}
     #endif
-    static func pinnedPanel(store: UsageStore, fixtureDate: Date? = nil) -> NSPanel {
+    static func pinnedPanel(store: UsageStore, fixtureDate: Date? = nil, qaIncreasedContrast: Bool = false) -> NSPanel {
         // The pinned copy has no MenuBarExtra host, so it always draws the Pacemark shell;
         // judge "System glass" in the real menu-bar popover.
         let host = NSHostingController(rootView: PopoverView(store: store, onOpenSettings: {}, isPinnedTuningCopy: true, fitsMenuBarWindowHeight: true)
             .environment(\.loadingDate, fixtureDate)
+            // A named high-contrast NSAppearance does not update SwiftUI's environment.
+            // Set the same key in the isolated QA panel without changing system preferences.
+            .transformEnvironment(\._colorSchemeContrast) { if qaIncreasedContrast { $0 = .increased } }
             .defaultAppStorage(AppComposition.launchDefaults))
         host.safeAreaRegions = []
         host.sizingOptions = [.preferredContentSize]
